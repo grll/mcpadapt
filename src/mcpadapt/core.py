@@ -94,6 +94,17 @@ async def mcptools(
             yield session, tools.tools
 
 
+def _in_ipython():
+    try:
+        import IPython
+
+        ipython = IPython.get_ipython()
+        if ipython is not None and hasattr(ipython, "kernel"):
+            return True
+    except ImportError:
+        return False
+
+
 class MCPAdapt:
     """The main class for adapting MCP tools to the desired Agent framework.
 
@@ -131,7 +142,17 @@ class MCPAdapt:
         self.mcp_tools: list[mcp.types.Tool] = None
 
         # all attributes used to manage the async loop and separate thread.
-        self.loop = asyncio.new_event_loop()
+        if _in_ipython():
+            print("Using existing event loop")
+            # ipython_loop = asyncio.get_event_loop()
+            import nest_asyncio
+
+            self.loop = asyncio.new_event_loop()
+            nest_asyncio.apply(self.loop)
+        else:
+            print("Creating new event loop")
+            self.loop = asyncio.new_event_loop()
+
         self.task = None
         self.ready = threading.Event()
         self.thread = threading.Thread(target=self._run_loop, daemon=True)

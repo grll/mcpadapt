@@ -19,6 +19,8 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "jupyter>=1.1.1",
+    "nest-asyncio>=1.6.0",
     "pre-commit>=4.0.1",
     "pytest>=8.3.4",
     "ruff>=0.9.1",
