@@ -8,6 +8,7 @@ Example Usage:
 >>>     print(tools)
 """
 
+from functools import partial
 from typing import Any, Callable, Coroutine
 
 import jsonref
@@ -29,7 +30,11 @@ JSON_SCHEMA_TO_PYTHON_TYPES = {
 
 
 def _generate_tool_class(
-    name: str, description: str, input_schema: dict[str, Any], async_func: bool = False
+    name: str,
+    description: str,
+    input_schema: dict[str, Any],
+    async_func: bool = False,
+    parse_docstring: bool = True,
 ) -> str:
     """Generate a tool BaseTool class for `langchain` from MCP tool information.
 
@@ -40,6 +45,7 @@ def _generate_tool_class(
         description: the description of the tool as used in the MCP protocol
         input_schema: the input schema of the tool as used in the MCP protocol
         async_func: whether the function is async or not
+        parse_docstring: whether to parse the docstring as a Google-Style docstring
 
     Returns:
         the generated langchain tool class as a string to be executed with exec.
@@ -63,14 +69,47 @@ def _generate_tool_class(
         def_statement = "async def"
         return_statement = f"return (await func({argument})).content[0].text"
 
+    # define the decorator based on parse_docstring
+    decorator = "@tool(parse_docstring=True)" if parse_docstring else "@tool"
+
     class_template = f'''
-@tool(parse_docstring=True)
+{decorator}
 {def_statement} {name}({tool_params}) -> str:
     """{description}"""
     {return_statement}
 '''.strip()
 
     return class_template
+
+
+def _instanciate_tool(
+    mcp_tool_name: str,
+    generate_class_template: Callable[[bool], str],
+    func: Callable[[dict | None], mcp.types.CallToolResult]
+    | Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]],
+) -> BaseTool:
+    """Instanciate a tool from a class template and a function wrapping the mcp tool_call.
+
+    Args:
+        mcp_tool_name: the name of the tool as used in the MCP protocol
+        generate_class_template: a function that generates the class template
+            (with or without parsing the docstring)
+        func: the function wrapping the mcp tool_call
+
+    Returns:
+        the instanciated langchain tool
+    """
+    # Create namespace and execute the class definition
+    namespace = {"tool": langchain_core.tools.tool, "func": func}
+    try:
+        exec(generate_class_template(True), namespace)
+    except ValueError as e:
+        if "Found invalid Google-Style docstring." in str(e):
+            exec(generate_class_template(False), namespace)
+
+    # Get the class from namespace and instantiate it
+    tool = namespace[mcp_tool_name]
+    return tool
 
 
 class LangChainAdapter(ToolAdapter):
@@ -85,38 +124,28 @@ class LangChainAdapter(ToolAdapter):
         func: Callable[[dict | None], mcp.types.CallToolResult],
         mcp_tool: mcp.types.Tool,
     ) -> BaseTool:
-        class_template = _generate_tool_class(
-            mcp_tool.name, mcp_tool.description, mcp_tool.inputSchema
+        generate_class_template = partial(
+            _generate_tool_class,
+            mcp_tool.name,
+            mcp_tool.description,
+            mcp_tool.inputSchema,
+            False,
         )
-
-        print(class_template)
-
-        # Create namespace and execute the class definition
-        namespace = {"tool": langchain_core.tools.tool, "func": func}
-        exec(class_template, namespace)
-
-        # Get the class from namespace and instantiate it
-        tool = namespace[mcp_tool.name]
-        return tool
+        return _instanciate_tool(mcp_tool.name, generate_class_template, func)
 
     def async_adapt(
         self,
         afunc: Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]],
         mcp_tool: mcp.types.Tool,
     ) -> BaseTool:
-        class_template = _generate_tool_class(
-            mcp_tool.name, mcp_tool.description, mcp_tool.inputSchema, async_func=True
+        generate_class_template = partial(
+            _generate_tool_class,
+            mcp_tool.name,
+            mcp_tool.description,
+            mcp_tool.inputSchema,
+            True,
         )
-
-        print(class_template)
-
-        # Create namespace and execute the class definition
-        namespace = {"tool": langchain_core.tools.tool, "func": afunc}
-        exec(class_template, namespace)
-
-        # Get the class from namespace and instantiate it
-        tool = namespace[mcp_tool.name]
-        return tool
+        return _instanciate_tool(mcp_tool.name, generate_class_template, afunc)
 
 
 if __name__ == "__main__":
