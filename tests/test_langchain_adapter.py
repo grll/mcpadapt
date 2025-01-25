@@ -26,7 +26,7 @@ def echo_server_script():
 
 
 @pytest.mark.asyncio
-async def test_langchain_adapter_async(echo_server_script):
+async def test_basic_async(echo_server_script):
     async with MCPAdapt(
         StdioServerParameters(
             command="uv", args=["run", "python", "-c", echo_server_script]
@@ -39,7 +39,7 @@ async def test_langchain_adapter_async(echo_server_script):
         assert response == "Echo: hello"  # we expect the tool to return "Echo: hello"
 
 
-def test_langchain_adapter_sync(echo_server_script):
+def test_basic_sync(echo_server_script):
     with MCPAdapt(
         StdioServerParameters(
             command="uv", args=["run", "python", "-c", echo_server_script]
@@ -48,4 +48,56 @@ def test_langchain_adapter_sync(echo_server_script):
     ) as tools:
         assert len(tools) == 1
         assert tools[0].name == "echo_tool"
+        assert tools[0].invoke("hello") == "Echo: hello"
+
+
+def test_tool_name_with_dashes():
+    mcp_server_script = dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Echo Server")
+
+        @mcp.tool(name="echo-tool")
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            return f"Echo: {text}"
+        
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        LangChainAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0].name == "echo-tool"
+        assert tools[0].invoke("hello") == "Echo: hello"
+
+
+def test_tool_name_with_keyword():
+    mcp_server_script = dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Echo Server")
+
+        @mcp.tool(name="def")
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            return f"Echo: {text}"
+        
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        LangChainAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0].name == "def"
         assert tools[0].invoke("hello") == "Echo: hello"
