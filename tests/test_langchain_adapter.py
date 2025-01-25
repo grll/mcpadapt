@@ -73,7 +73,7 @@ def test_tool_name_with_dashes():
         LangChainAdapter(),
     ) as tools:
         assert len(tools) == 1
-        assert tools[0].name == "echo-tool"
+        assert tools[0].name == "echo_tool"
         assert tools[0].invoke("hello") == "Echo: hello"
 
 
@@ -99,5 +99,5 @@ def test_tool_name_with_keyword():
         LangChainAdapter(),
     ) as tools:
         assert len(tools) == 1
-        assert tools[0].name == "def"
+        assert tools[0].name == "def_"
         assert tools[0].invoke("hello") == "Echo: hello"

@@ -8,6 +8,9 @@ Example Usage:
 >>>     print(tools)
 """
 
+import keyword
+import logging
+import re
 from functools import partial
 from typing import Any, Callable, Coroutine
 
@@ -18,6 +21,8 @@ from langchain.tools import BaseTool
 
 from mcpadapt.core import ToolAdapter
 
+log = logging.getLogger(__name__)
+
 JSON_SCHEMA_TO_PYTHON_TYPES = {
     "string": "str",
     "number": "float",
@@ -27,6 +32,28 @@ JSON_SCHEMA_TO_PYTHON_TYPES = {
     "boolean": "bool",
     "null": "None",
 }
+
+
+def _sanitize_function_name(name):
+    """
+    A function to sanitize function names to be used as a tool name.
+    Prevent the use of dashes or other python keywords as function names by tool.
+    """
+    # Replace dashes with underscores
+    name = name.replace("-", "_")
+
+    # Remove any characters that aren't alphanumeric or underscore
+    name = re.sub(r"[^\w_]", "", name)
+
+    # Ensure it doesn't start with a number
+    if name[0].isdigit():
+        name = f"_{name}"
+
+    # Check if it's a Python keyword
+    if keyword.iskeyword(name):
+        name = f"{name}_"
+
+    return name
 
 
 def _generate_tool_class(
@@ -99,6 +126,7 @@ def _instanciate_tool(
     Returns:
         the instanciated langchain tool
     """
+
     # Create namespace and execute the class definition
     namespace = {"tool": langchain_core.tools.tool, "func": func}
     try:
@@ -117,6 +145,10 @@ class LangChainAdapter(ToolAdapter):
 
     Note that `langchain` support both sync and async tools so we
     write adapt for both methods.
+
+    Warning: if the mcp tool name is a python keyword, starts with digits or contains
+    dashes, the tool name will be sanitized to become a valid python function name.
+
     """
 
     def adapt(
@@ -124,28 +156,36 @@ class LangChainAdapter(ToolAdapter):
         func: Callable[[dict | None], mcp.types.CallToolResult],
         mcp_tool: mcp.types.Tool,
     ) -> BaseTool:
+        mcp_tool_name = _sanitize_function_name(mcp_tool.name)
+        if mcp_tool_name != mcp_tool.name:
+            log.warning(f"MCP tool name {mcp_tool.name} sanitized to {mcp_tool_name}")
+
         generate_class_template = partial(
             _generate_tool_class,
-            mcp_tool.name,
+            mcp_tool_name,
             mcp_tool.description,
             mcp_tool.inputSchema,
             False,
         )
-        return _instanciate_tool(mcp_tool.name, generate_class_template, func)
+        return _instanciate_tool(mcp_tool_name, generate_class_template, func)
 
     def async_adapt(
         self,
         afunc: Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]],
         mcp_tool: mcp.types.Tool,
     ) -> BaseTool:
+        mcp_tool_name = _sanitize_function_name(mcp_tool.name)
+        if mcp_tool_name != mcp_tool.name:
+            log.warning(f"MCP tool name {mcp_tool.name} sanitized to {mcp_tool_name}")
+
         generate_class_template = partial(
             _generate_tool_class,
-            mcp_tool.name,
+            mcp_tool_name,
             mcp_tool.description,
             mcp_tool.inputSchema,
             True,
         )
-        return _instanciate_tool(mcp_tool.name, generate_class_template, afunc)
+        return _instanciate_tool(mcp_tool_name, generate_class_template, afunc)
 
 
 if __name__ == "__main__":
