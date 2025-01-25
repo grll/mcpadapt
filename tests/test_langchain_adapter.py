@@ -1,4 +1,3 @@
-import asyncio
 from textwrap import dedent
 
 import pytest
@@ -8,10 +7,9 @@ from mcpadapt.core import MCPAdapt
 from mcpadapt.langchain_adapter import LangChainAdapter
 
 
-@pytest.mark.asyncio
-async def test_langchain_adapter():
-    # define a mcp server with a tool for this test
-    mcp_server_script = dedent(
+@pytest.fixture
+def echo_server_script():
+    return dedent(
         '''
         from mcp.server.fastmcp import FastMCP
 
@@ -26,10 +24,12 @@ async def test_langchain_adapter():
         '''
     )
 
-    # test asynchronously tool invocation
+
+@pytest.mark.asyncio
+async def test_langchain_adapter_async(echo_server_script):
     async with MCPAdapt(
         StdioServerParameters(
-            command="uv", args=["run", "python", "-c", mcp_server_script]
+            command="uv", args=["run", "python", "-c", echo_server_script]
         ),
         LangChainAdapter(),
     ) as tools:
@@ -37,3 +37,15 @@ async def test_langchain_adapter():
         assert tools[0].name == "echo_tool"  # we expect the tool to be named echo_tool
         response = await tools[0].ainvoke("hello")
         assert response == "Echo: hello"  # we expect the tool to return "Echo: hello"
+
+
+def test_langchain_adapter_sync(echo_server_script):
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", echo_server_script]
+        ),
+        LangChainAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0].name == "echo_tool"
+        assert tools[0].invoke("hello") == "Echo: hello"
