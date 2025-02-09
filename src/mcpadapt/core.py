@@ -183,10 +183,10 @@ class MCPAdapt:
 
     def close(self):
         """Clean up resources and stop the client."""
-        if self.task:
+        if self.task and not self.task.done():
             self.loop.call_soon_threadsafe(self.task.cancel)
-        self.thread.join()
-        self.loop.call_soon_threadsafe(self.loop.stop)
+        self.thread.join()  # will wait until the task is cancelled to join thread (as it's blocked Event().wait())
+        self.loop.close()  # we won't be using the loop anymore we can safely close it
 
     def __enter__(self):
         return self.tools()
