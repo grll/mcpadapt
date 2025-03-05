@@ -18,20 +18,25 @@ import smolagents
 from mcpadapt.core import ToolAdapter
 
 
-def _generate_tool_inputs(resolved_json_schema: dict[str, Any]) -> dict[str, str]:
+def _generate_tool_inputs(resolved_json_schema: dict[str, Any]) -> dict[str, dict[str, str]]:
     """
     takes an json_schema as used in the MCP protocol and return an inputs dict for
     smolagents tools. see AUTHORIZED_TYPES in smolagents.tools for the types allowed.
     Note that we consider the json_schema to already have $ref resolved with jsonref for
     example.
     """
-    return {
-        # TODO: use google-docstring-parser to parse description of args and pass it here...
-        k: {"type": v["type"], "description": v.get("description", "")}
-        for k, v in resolved_json_schema.items()
-    }
-
-
+    inputs: dict[str, dict[str, str]] = {}
+    for k, v in resolved_json_schema.items():
+        inputs[k] = {
+            "type": v.get("type") or v.get("anyOf")[0].get("type"),
+            "description": v.get("description", "") # TODO: use google-docstring-parser to parse description of args and pass it here...
+        }
+        if "default" in v:
+            inputs[k]["default"] = str(v["default"])
+            inputs[k]["nullable"] = "True"
+    return inputs
+   
+   
 def _generate_tool_class(
     name: str,
     description: str,
@@ -61,7 +66,10 @@ def _generate_tool_class(
 
     # smolagents provide arguments to the forward as follow forward(arg1=..., arg2=...)
     # but MCP call_tool takes a single 'argument' as in func({'arg1': .., 'arg2': ..})
-    forward_params = ", ".join(f"{k}" for k in smolagents_inputs.keys())
+    forward_params = ", ".join(
+        f"{k}={v['default']}" if "default" in v else f"{k}"
+        for k, v in smolagents_inputs.items()
+    )
     argument = "{" + ", ".join(f"'{k}': {k}" for k in smolagents_inputs.keys()) + "}"
 
     class_template = f'''
