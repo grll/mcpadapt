@@ -62,6 +62,13 @@ def echo_server_optional_script():
         def echo_tool_default_value(text: str = "empty") -> str:
             """Echo the input text, default to 'empty' if no text is provided"""
             return f"Echo: {text}"
+
+        @mcp.tool()
+        def echo_tool_union_none(text: str | None) -> str:
+            """Echo the input text, but None is not specified by default."""
+            if text is None:
+                return "No input provided"
+            return f"Echo: {text}"
         
         mcp.run()
         '''
@@ -119,10 +126,12 @@ def test_optional_sync(echo_server_optional_script):
         ),
         SmolAgentsAdapter(),
     ) as tools:
-        assert len(tools) == 2
+        assert len(tools) == 3
         assert tools[0].name == "echo_tool_optional"
         assert tools[0]("hello") == "Echo: hello"
         assert tools[0]() == "No input provided"
         assert tools[1].name == "echo_tool_default_value"
         assert tools[1]("hello") == "Echo: hello"
         assert tools[1]() == "Echo: empty"
+        assert tools[2].name == "echo_tool_union_none"
+        assert tools[2]("hello") == "Echo: hello"

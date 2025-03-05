@@ -18,7 +18,9 @@ import smolagents
 from mcpadapt.core import ToolAdapter
 
 
-def _generate_tool_inputs(resolved_json_schema: dict[str, Any]) -> dict[str, dict[str, str]]:
+def _generate_tool_inputs(
+    resolved_json_schema: dict[str, Any],
+) -> dict[str, dict[str, str]]:
     """
     takes an json_schema as used in the MCP protocol and return an inputs dict for
     smolagents tools. see AUTHORIZED_TYPES in smolagents.tools for the types allowed.
@@ -29,14 +31,20 @@ def _generate_tool_inputs(resolved_json_schema: dict[str, Any]) -> dict[str, dic
     for k, v in resolved_json_schema.items():
         inputs[k] = {
             "type": v.get("type") or v.get("anyOf")[0].get("type"),
-            "description": v.get("description", "") # TODO: use google-docstring-parser to parse description of args and pass it here...
+            "description": v.get(
+                "description", ""
+            ),  # TODO: use google-docstring-parser to parse description of args and pass it here...
         }
         if "default" in v:
-            inputs[k]["default"] = f'"{v["default"]}"' if isinstance(v["default"], str) else str(v["default"])
+            inputs[k]["default"] = (
+                f'"{v["default"]}"'
+                if isinstance(v["default"], str)
+                else str(v["default"])
+            )
             inputs[k]["nullable"] = "True"
     return inputs
-   
-   
+
+
 def _generate_tool_class(
     name: str,
     description: str,
