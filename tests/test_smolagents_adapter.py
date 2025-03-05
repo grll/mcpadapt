@@ -44,6 +44,31 @@ def echo_server_sse_script():
 
 
 @pytest.fixture
+def echo_server_optional_script():
+    return dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Echo Server")
+
+        @mcp.tool()
+        def echo_tool_optional(text: str | None = None) -> str:
+            """Echo the input text, or return a default message if no text is provided"""
+            if text is None:
+                return "No input provided"
+            return f"Echo: {text}"
+
+        @mcp.tool()
+        def echo_tool_default_value(text: str = "empty") -> str:
+            """Echo the input text, default to 'empty' if no text is provided"""
+            return f"Echo: {text}"
+        
+        mcp.run()
+        '''
+    )
+
+
+@pytest.fixture
 async def echo_sse_server(echo_server_sse_script):
     import subprocess
     import time
@@ -85,3 +110,19 @@ def test_basic_sync_sse(echo_sse_server):
         assert len(tools) == 1
         assert tools[0].name == "echo_tool"
         assert tools[0]("hello") == "Echo: hello"
+
+
+def test_optional_sync(echo_server_optional_script):
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", echo_server_optional_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        assert len(tools) == 2
+        assert tools[0].name == "echo_tool_optional"
+        assert tools[0]("hello") == "Echo: hello"
+        assert tools[0]() == "No input provided"
+        assert tools[1].name == "echo_tool_default_value"
+        assert tools[1]("hello") == "Echo: hello"
+        assert tools[1]() == "Echo: empty"

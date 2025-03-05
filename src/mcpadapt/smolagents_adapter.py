@@ -32,7 +32,7 @@ def _generate_tool_inputs(resolved_json_schema: dict[str, Any]) -> dict[str, dic
             "description": v.get("description", "") # TODO: use google-docstring-parser to parse description of args and pass it here...
         }
         if "default" in v:
-            inputs[k]["default"] = str(v["default"])
+            inputs[k]["default"] = f'"{v["default"]}"' if isinstance(v["default"], str) else str(v["default"])
             inputs[k]["nullable"] = "True"
     return inputs
    
