@@ -8,6 +8,7 @@ dependencies = [
     "mcp>=1.2.0",
     "jsonref>=1.1.0",
     "python-dotenv>=1.0.1",
+    "pydantic>=2.10.6",
 ]
 classifiers = [
     "Programming Language :: Python :: 3.10",
@@ -32,6 +33,9 @@ test = [
     "pytest>=8.3.4",
     "mcpadapt[langchain]",
     "mcpadapt[smolagents]"
+]
+crewai = [
+    "crewai>=0.108.0",
 ]
 
 [tool.hatch.version]
