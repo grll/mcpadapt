@@ -32,7 +32,8 @@ test = [
     "pytest-asyncio>=0.25.2",
     "pytest>=8.3.4",
     "mcpadapt[langchain]",
-    "mcpadapt[smolagents]"
+    "mcpadapt[smolagents]",
+    "mcpadapt[crewai]"
 ]
 crewai = [
     "crewai>=0.108.0",
