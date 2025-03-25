@@ -35,7 +35,7 @@ class ToolAdapter(ABC):
         :meth:`ToolAdapter.async_adapt` if you need to use the tool asynchronously.
 
         Args:
-            func: The function to be called.
+            func: The function to be called (will call the tool via the MCP protocol).
             mcp_tool: The tool to adapt.
 
         Returns:
