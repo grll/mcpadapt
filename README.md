@@ -47,6 +47,8 @@ You can also add multiple framework comma separated if needed.
 
 ## Usage
 
+⚠️ **Security Warning**: When using MCP servers, especially over SSE (Server-Sent Events), be extremely cautious and only connect to trusted and verified servers. Some adapters use Python's `exec` function internally, which could potentially allow for remote code execution if connected to a malicious server. Always verify the source and security of any MCP server before connecting.
+
 ### Smolagents
 
 Since mcpadapt is part of smolagents simple use tool collection from smolagents like:
