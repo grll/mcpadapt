@@ -3,13 +3,14 @@ FastMCP dummy Echo Server for testing purposes.
 """
 
 from mcp.server.fastmcp import FastMCP
+from pydantic import Field
 
 # Create server
 mcp = FastMCP("Echo Server")
 
 
 @mcp.tool()
-def echo_tool(text: str) -> str:
+def echo_tool(text: str = Field(description="The text to echo")) -> str:
     """Echo the input text
 
     Args:
