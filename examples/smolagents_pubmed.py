@@ -13,7 +13,7 @@ Usage:
 import os
 
 from mcp import StdioServerParameters
-from smolagents import CodeAgent, HfApiModel
+from smolagents import CodeAgent, HfApiModel  # type: ignore
 
 from mcpadapt.core import MCPAdapt
 from mcpadapt.smolagents_adapter import SmolAgentsAdapter
