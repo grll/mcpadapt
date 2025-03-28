@@ -8,95 +8,16 @@ Example Usage:
 >>>     print(tools)
 """
 
-import json
-from typing import Any, Callable
+import logging
+from typing import Callable
 
-import jsonref
+import jsonref  # type: ignore
 import mcp
-import smolagents
+import smolagents  # type: ignore
 
 from mcpadapt.core import ToolAdapter
 
-
-def _generate_tool_inputs(
-    resolved_json_schema: dict[str, Any],
-) -> dict[str, dict[str, str]]:
-    """
-    takes an json_schema as used in the MCP protocol and return an inputs dict for
-    smolagents tools. see AUTHORIZED_TYPES in smolagents.tools for the types allowed.
-    Note that we consider the json_schema to already have $ref resolved with jsonref for
-    example.
-    """
-    inputs: dict[str, dict[str, str]] = {}
-    for k, v in resolved_json_schema.items():
-        inputs[k] = {
-            "type": v.get("type") or v.get("anyOf")[0].get("type"),
-            "description": v.get(
-                "description", ""
-            ),  # TODO: use google-docstring-parser to parse description of args and pass it here...
-        }
-        if "default" in v:
-            inputs[k]["default"] = (
-                f'"{v["default"]}"'
-                if isinstance(v["default"], str)
-                else str(v["default"])
-            )
-            inputs[k]["nullable"] = "True"
-    return inputs
-
-
-def _generate_tool_class(
-    name: str,
-    description: str,
-    inputSchema: dict[str, Any],
-) -> str:
-    """generate a smolagents tool class from the MCP protocol informations.
-
-    Note: we generate code because smolagents is very picky about the signature of the
-    forward method matching the inputs name and type.
-
-    Return a string with the class so it's easy to test and debug the generated code.
-
-    Args:
-        name: the name of the tool as used in the MCP protocol
-        description: the description of the tool as used in the MCP protocol
-        inputSchema: the input schema of the tool as used in the MCP protocol
-
-    Returns:
-        the generated smolagentstool class as a string to be executed with exec.
-        **important**: the class_template need smolagents and func in the namespace to
-        be exec. We assume func as being a sync function taking a single dict argument
-        and returning a CallToolResult as in:
-        func: Callable[[dict | None], mcp.types.CallToolResult]
-    """
-    resolved_json_schema = jsonref.replace_refs(inputSchema).get("properties", {})
-    smolagents_inputs = _generate_tool_inputs(resolved_json_schema)
-
-    # smolagents provide arguments to the forward as follow forward(arg1=..., arg2=...)
-    # but MCP call_tool takes a single 'argument' as in func({'arg1': .., 'arg2': ..})
-    forward_params = ", ".join(
-        f"{k}={v['default']}" if "default" in v else f"{k}"
-        for k, v in smolagents_inputs.items()
-    )
-    argument = "{" + ", ".join(f"'{k}': {k}" for k in smolagents_inputs.keys()) + "}"
-
-    class_template = f'''
-class SmolAgentsTool(smolagents.Tool):
-    def __init__(self):
-        super().__init__()
-        self.name = "{name}"
-        self.description = """{description}"""
-        self.inputs = {json.dumps(smolagents_inputs)}
-        self.output_type = "string"
-    
-    def forward(self, {forward_params}) -> str:
-        """
-        Forward method with dynamically generated parameters and argument.
-        """
-        return func({argument}).content[0].text
-'''.strip()
-
-    return class_template
+logger = logging.getLogger(__name__)
 
 
 class SmolAgentsAdapter(ToolAdapter):
@@ -111,26 +32,89 @@ class SmolAgentsAdapter(ToolAdapter):
         func: Callable[[dict | None], mcp.types.CallToolResult],
         mcp_tool: mcp.types.Tool,
     ) -> smolagents.Tool:
-        class_template = _generate_tool_class(
-            mcp_tool.name, mcp_tool.description, mcp_tool.inputSchema
+        class MCPAdaptTool(smolagents.Tool):
+            def __init__(
+                self,
+                name: str,
+                description: str,
+                inputs: dict[str, dict[str, str]],
+                output_type: str,
+            ):
+                self.name = name
+                self.description = description
+                self.inputs = inputs
+                self.output_type = output_type
+                self.is_initialized = True
+                self.skip_forward_signature_validation = True
+
+            def forward(self, *args, **kwargs) -> str:
+                if len(args) > 0:
+                    if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
+                        mcp_output = func(args[0])
+                    else:
+                        raise ValueError(
+                            f"tool {self.name} does not support multiple positional arguments or combined positional and keyword arguments"
+                        )
+                else:
+                    mcp_output = func(kwargs)
+
+                if len(mcp_output.content) == 0:
+                    raise ValueError(f"tool {self.name} returned an empty content")
+
+                if len(mcp_output.content) > 1:
+                    logger.warning(
+                        f"tool {self.name} returned multiple content, using the first one"
+                    )
+
+                if not isinstance(mcp_output.content[0], mcp.types.TextContent):
+                    raise ValueError(
+                        f"tool {self.name} returned a non-text content: `{type(mcp_output.content[0])}`"
+                    )
+
+                return mcp_output.content[0].text  # type: ignore
+
+        # make sure jsonref are resolved
+        input_schema = {
+            k: v
+            for k, v in jsonref.replace_refs(mcp_tool.inputSchema).items()
+            if k != "$defs"
+        }
+
+        # make sure mandatory `description` and `type` is provided for each arguments:
+        for k, v in input_schema["properties"].items():
+            if "description" not in v:
+                input_schema["properties"][k]["description"] = "see tool description"
+            if "type" not in v:
+                input_schema["properties"][k]["type"] = "string"
+
+        tool = MCPAdaptTool(
+            name=mcp_tool.name,
+            description=mcp_tool.description or "",
+            inputs=input_schema["properties"],
+            output_type="string",
         )
 
-        # Create namespace and execute the class definition
-        namespace = {"smolagents": smolagents, "func": func}
-        exec(class_template, namespace)
-
-        # Get the class from namespace and instantiate it
-        tool = namespace["SmolAgentsTool"]()
         return tool
 
 
 if __name__ == "__main__":
+    import os
+
     from mcp import StdioServerParameters
 
     from mcpadapt.core import MCPAdapt
 
     with MCPAdapt(
-        StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
+        StdioServerParameters(
+            command="uvx",
+            args=["--quiet", "pubmedmcp@0.1.3"],
+            env={"UV_PYTHON": "3.12", **os.environ},
+        ),
         SmolAgentsAdapter(),
     ) as tools:
         print(tools)
+        # that's all that goes into the system prompt:
+        print(tools[0].name)
+        print(tools[0].description)
+        print(tools[0].inputs)
+        print(tools[0].output_type)
