@@ -105,7 +105,7 @@ def test_basic_sync(echo_server_script):
     ) as tools:
         assert len(tools) == 1
         assert tools[0].name == "echo_tool"
-        assert tools[0]("hello") == "Echo: hello"
+        assert tools[0](text="hello") == "Echo: hello"
 
 
 def test_basic_sync_sse(echo_sse_server):
@@ -116,7 +116,7 @@ def test_basic_sync_sse(echo_sse_server):
     ) as tools:
         assert len(tools) == 1
         assert tools[0].name == "echo_tool"
-        assert tools[0]("hello") == "Echo: hello"
+        assert tools[0](text="hello") == "Echo: hello"
 
 
 def test_optional_sync(echo_server_optional_script):
@@ -128,10 +128,10 @@ def test_optional_sync(echo_server_optional_script):
     ) as tools:
         assert len(tools) == 3
         assert tools[0].name == "echo_tool_optional"
-        assert tools[0]("hello") == "Echo: hello"
+        assert tools[0](text="hello") == "Echo: hello"
         assert tools[0]() == "No input provided"
         assert tools[1].name == "echo_tool_default_value"
-        assert tools[1]("hello") == "Echo: hello"
+        assert tools[1](text="hello") == "Echo: hello"
         assert tools[1]() == "Echo: empty"
         assert tools[2].name == "echo_tool_union_none"
-        assert tools[2]("hello") == "Echo: hello"
+        assert tools[2](text="hello") == "Echo: hello"
