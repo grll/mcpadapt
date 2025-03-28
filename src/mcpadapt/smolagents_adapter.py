@@ -29,8 +29,26 @@ def _generate_tool_inputs(
     """
     inputs: dict[str, dict[str, str]] = {}
     for k, v in resolved_json_schema.items():
+        # Get type from direct type field, anyOf, or oneOf, handling None cases
+        type_value = v.get("type")
+        if type_value is None:
+            # Try anyOf
+            anyOf = v.get("anyOf")
+            if anyOf and len(anyOf) > 0:
+                type_value = anyOf[0].get("type")
+            
+            # If still None, try oneOf
+            if type_value is None:
+                oneOf = v.get("oneOf")
+                if oneOf and len(oneOf) > 0:
+                    type_value = oneOf[0].get("type")
+        
+        # Default to "string" if we still couldn't find a type
+        if type_value is None:
+            type_value = "string"
+            
         inputs[k] = {
-            "type": v.get("type") or v.get("anyOf")[0].get("type"),
+            "type": type_value,
             "description": v.get(
                 "description", ""
             ),  # TODO: use google-docstring-parser to parse description of args and pass it here...
