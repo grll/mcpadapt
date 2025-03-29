@@ -13,8 +13,8 @@ from typing import Any, Callable, Coroutine
 
 import mcp
 from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
 from mcp.client.sse import sse_client
+from mcp.client.stdio import stdio_client
 
 
 class ToolAdapter(ABC):

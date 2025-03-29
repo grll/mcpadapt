@@ -33,10 +33,14 @@ test = [
     "pytest>=8.3.4",
     "mcpadapt[langchain]",
     "mcpadapt[smolagents]",
-    "mcpadapt[crewai]"
+    "mcpadapt[crewai]",
+    "mcpadapt[google-genai]"
 ]
 crewai = [
     "crewai>=0.108.0",
+]
+google-genai = [
+    "google-genai>=1.2.0",
 ]
 
 [tool.hatch.version]
