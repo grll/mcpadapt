@@ -135,10 +135,15 @@ class MCPAdapt:
     >>> # async usage with sse
     >>> async with MCPAdapt({"host": "127.0.0.1", "port": 8000}, SmolAgentAdapter()) as tools:
     >>>     print(tools)
+
+    You can also specify connect_timeout in seconds to the mcp server (default is 30s).
     """
 
     def __init__(
-        self, serverparams: StdioServerParameters | dict[str, Any], adapter: ToolAdapter
+        self,
+        serverparams: StdioServerParameters | dict[str, Any],
+        adapter: ToolAdapter,
+        connect_timeout=30,
     ):
         # attributes we receive from the user.
         self.serverparams = serverparams
@@ -156,7 +161,9 @@ class MCPAdapt:
 
         # start the loop in a separate thread and wait till ready synchronously.
         self.thread.start()
-        self.ready.wait()
+        # check connection to mcp server is ready
+        if not self.ready.wait(timeout=connect_timeout):
+            raise RuntimeError("Cannot connect to MCP server !")
 
     def _run_loop(self):
         """Runs the event loop in a separate thread (for synchronous usage)."""
