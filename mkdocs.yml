@@ -1,0 +1,97 @@
+site_name: MCP Adapt
+repo_url: https://github.com/grll/mcpadapt
+repo_name: grll/mcpadapt
+theme:
+  name: material
+  features:
+    # Allows copying code blocks
+    - content.code.copy
+    # Allows selecting code blocks
+    - content.code.select
+    # Shows the current path in the sidebar
+    - navigation.path
+    # Shows sections in the sidebar
+    - navigation.sections
+    # Shows sections expanded by default
+    - navigation.expand
+    # Enables annotations in code blocks
+    - content.code.annotate
+  palette:
+    primary: custom
+    accent: custom
+    scheme: default
+  logo: assets/logo_dark_transparent_cropped.png
+  favicon: images/favicon.ico
+  font:
+    text: Inter
+    code: Fira Code
+nav:
+  - Intro: index.md
+  - Quickstart: quickstart.md
+  - Guided Examples: 
+    - guide/smolagents.md
+    - guide/crewai.md
+    - guide/langchain.md
+    - guide/google-genai.md
+  - API Reference:
+      - Core: ref/core.md
+      - SmolAgents Adapter: ref/smolagents_adapter.md
+      - CrewAI Adapter: ref/crewai_adapter.md
+      - LangChain Adapter: ref/langchain_adapter.md
+      - Google GenAI Adapter: ref/google_genai_adapter.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["src/mcpadapt"]
+          selection:
+            docstring_style: google
+          options:
+            # Shows links to other members in signatures
+            signature_crossrefs: true
+            # Orders members by source order, rather than alphabetical
+            members_order: source
+            # Puts the signature on a separate line from the member name
+            separate_signature: true
+            # Shows type annotations in signatures
+            show_signature_annotations: true
+            # Makes the font sizes nicer
+            heading_level: 3
+            # Show inherited members
+            inherited_members: true
+
+extra:
+  # Remove material generation message in footer
+  generator: false
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+extra_css:
+  - stylesheets/extra.css
+
+watch:
+  - "src/mcpadapt"

@@ -12,3 +12,6 @@ wheels/
 
 # Notebooks
 notebooks/
+
+# mkdocs documentation
+/site

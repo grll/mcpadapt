@@ -4,6 +4,8 @@ dynamic = ["version"]
 description = "Adapt MCP servers to many agentic framework."
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "Guillaume Raille", email = "guillaume.raille@gmail.com" }]
 dependencies = [
     "mcp>=1.2.0",
     "jsonref>=1.1.0",
@@ -11,10 +13,21 @@ dependencies = [
     "pydantic>=2.10.6",
 ]
 classifiers = [
+    "Typing :: Typed",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "License :: OSI Approved :: MIT License",
 ]
+
+[project.urls]
+Homepage = "https://github.com/grll/mcpadapt"
+Repository = "https://github.com/grll/mcpadapt"
 
 [project.optional-dependencies]
 smolagents = [
@@ -53,9 +66,15 @@ build-backend = "hatchling.build"
 [dependency-groups]
 dev = [
     "jupyter>=1.1.1",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.10",
+    "mkdocstrings[python]>=0.29.1",
     "pre-commit>=4.0.1",
     "ruff>=0.9.1",
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"

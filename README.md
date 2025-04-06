@@ -47,7 +47,7 @@ You can also add multiple framework comma separated if needed.
 
 ## Usage
 
-⚠️ **Security Warning**: When using MCP servers, especially over SSE (Server-Sent Events), be extremely cautious and only connect to trusted and verified servers. Some adapters use Python's `exec` function internally, which could potentially allow for remote code execution if connected to a malicious server. Always verify the source and security of any MCP server before connecting.
+⚠️ **Security Warning**: When using MCP servers, especially over SSE (Server-Sent Events), be extremely cautious and only connect to trusted and verified servers. Always verify the source and security of any MCP server before connecting.
 
 ### Smolagents
 
@@ -129,3 +129,16 @@ class YourFrameworkAdapter(ToolAdapter):
 - [x] support for jupyter notebook
 - [x] add tests
 
+## Contributors
+
+We acknowledge the work and thanks every contributors and maintainers for their contributions.
+
+Core Maintainers:
+
+* [@grll](https://github.com/grll)
+
+Contributors:
+
+* [@murawakimitsuhiro](https://github.com/murawakimitsuhiro)
+* [@joejoe2](https://github.com/joejoe2)
+* [@tisDDM](https://github.com/tisDDM)

@@ -31,6 +31,15 @@ class GoogleGenAIAdapter(ToolAdapter):
     ) -> tuple[
         types.Tool, tuple[str, Callable[[dict | None], mcp.types.CallToolResult]]
     ]:
+        """Adapt a MCP tool to a Google GenAI tool.
+
+        Args:
+            func: The function to adapt.
+            mcp_tool: The MCP tool to adapt.
+
+        Returns:
+            A Google GenAI tool.
+        """
         # make sure jsonref are resolved
         input_schema = {
             k: v
@@ -61,6 +70,15 @@ class GoogleGenAIAdapter(ToolAdapter):
             str, Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]]
         ],
     ]:
+        """Adapt a MCP tool to a Google GenAI tool.
+
+        Args:
+            func: The function to adapt.
+            mcp_tool: The MCP tool to adapt.
+
+        Returns:
+            A Google GenAI tool.
+        """
         # make sure jsonref are resolved
         input_schema = {
             k: v

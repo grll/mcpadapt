@@ -7,7 +7,7 @@ Example Usage:
 >>>     print(tools)
 """
 
-from typing import Any, Callable, Type
+from typing import Any, Callable, Coroutine, Type
 
 import jsonref  # type: ignore
 import mcp
@@ -42,6 +42,15 @@ class CrewAIAdapter(ToolAdapter):
         func: Callable[[dict | None], mcp.types.CallToolResult],
         mcp_tool: mcp.types.Tool,
     ) -> BaseTool:
+        """Adapt a MCP tool to a CrewAI tool.
+
+        Args:
+            func: The function to adapt.
+            mcp_tool: The MCP tool to adapt.
+
+        Returns:
+            A CrewAI tool.
+        """
         ToolInput = create_model_from_json_schema(mcp_tool.inputSchema)
 
         class CrewAIMCPTool(BaseTool):
@@ -65,6 +74,13 @@ class CrewAIAdapter(ToolAdapter):
                 self.description = f"Tool Name: {self.name}\nTool Arguments: {args_schema}\nTool Description: {self.description}"
 
         return CrewAIMCPTool()
+
+    async def async_adapt(
+        self,
+        afunc: Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]],
+        mcp_tool: mcp.types.Tool,
+    ) -> Any:
+        raise NotImplementedError("async is not supported by the CrewAI framework.")
 
 
 if __name__ == "__main__":

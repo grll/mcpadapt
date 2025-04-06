@@ -25,7 +25,7 @@ class ToolAdapter(ABC):
         self,
         func: Callable[[dict | None], mcp.types.CallToolResult],
         mcp_tool: mcp.types.Tool,
-    ):
+    ) -> Any:
         """Adapt a single tool from MCP to the desired Agent framework.
 
         The MCP protocol will provide a name, description and inputSchema in JSON Schema
@@ -39,7 +39,7 @@ class ToolAdapter(ABC):
             mcp_tool: The tool to adapt.
 
         Returns:
-            The adapted tool.
+            The adapted tool in the agentic framework of choice.
         """
         pass
 
@@ -47,7 +47,7 @@ class ToolAdapter(ABC):
         self,
         afunc: Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]],
         mcp_tool: mcp.types.Tool,
-    ):
+    ) -> Any:
         """Adapt a single tool from MCP to the desired Agent framework.
 
         The MCP protocol will provide a name, description and inputSchema in JSON Schema
@@ -61,7 +61,7 @@ class ToolAdapter(ABC):
             mcp_tool: The tool to adapt.
 
         Returns:
-            The adapted tool.
+            The adapted tool in the agentic framework of choice.
         """
         raise NotImplementedError(
             "Async adaptation is not supported for this Agent framework."

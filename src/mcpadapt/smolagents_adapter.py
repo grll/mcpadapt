@@ -9,7 +9,7 @@ Example Usage:
 """
 
 import logging
-from typing import Callable
+from typing import Any, Callable, Coroutine
 
 import jsonref  # type: ignore
 import mcp
@@ -32,6 +32,16 @@ class SmolAgentsAdapter(ToolAdapter):
         func: Callable[[dict | None], mcp.types.CallToolResult],
         mcp_tool: mcp.types.Tool,
     ) -> smolagents.Tool:
+        """Adapt a MCP tool to a SmolAgents tool.
+
+        Args:
+            func: The function to adapt.
+            mcp_tool: The MCP tool to adapt.
+
+        Returns:
+            A SmolAgents tool.
+        """
+
         class MCPAdaptTool(smolagents.Tool):
             def __init__(
                 self,
@@ -95,6 +105,13 @@ class SmolAgentsAdapter(ToolAdapter):
         )
 
         return tool
+
+    async def async_adapt(
+        self,
+        afunc: Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]],
+        mcp_tool: mcp.types.Tool,
+    ) -> smolagents.Tool:
+        raise NotImplementedError("async is not supported by the SmolAgents framework.")
 
 
 if __name__ == "__main__":

@@ -156,9 +156,16 @@ class LangChainAdapter(ToolAdapter):
         func: Callable[[dict | None], mcp.types.CallToolResult],
         mcp_tool: mcp.types.Tool,
     ) -> BaseTool:
+        """Adapt a MCP tool to a LangChain tool.
+
+        Args:
+            func: The function to adapt.
+            mcp_tool: The MCP tool to adapt.
+
+        Returns:
+            A LangChain tool.
+        """
         mcp_tool_name = _sanitize_function_name(mcp_tool.name)
-        if mcp_tool_name != mcp_tool.name:
-            log.warning(f"MCP tool name {mcp_tool.name} sanitized to {mcp_tool_name}")
 
         generate_class_template = partial(
             _generate_tool_class,
@@ -174,6 +181,15 @@ class LangChainAdapter(ToolAdapter):
         afunc: Callable[[dict | None], Coroutine[Any, Any, mcp.types.CallToolResult]],
         mcp_tool: mcp.types.Tool,
     ) -> BaseTool:
+        """Adapt a MCP tool to a LangChain tool.
+
+        Args:
+            afunc: The function to adapt.
+            mcp_tool: The MCP tool to adapt.
+
+        Returns:
+            A LangChain tool.
+        """
         mcp_tool_name = _sanitize_function_name(mcp_tool.name)
         if mcp_tool_name != mcp_tool.name:
             log.warning(f"MCP tool name {mcp_tool.name} sanitized to {mcp_tool_name}")

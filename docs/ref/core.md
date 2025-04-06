@@ -1,0 +1,3 @@
+# `Core`
+
+::: mcpadapt.core
