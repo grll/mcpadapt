@@ -1,0 +1,48 @@
+/* 
+    Root variables that apply to all color schemes.
+    Material for MkDocs automatically switches data-md-color-scheme
+    between "default" (light) and "slate" (dark) when you use the toggles.
+*/
+:root {
+
+    /* Global color variables */
+    --md-default-fg-color: #212121;
+    --md-default-bg-color: #000000;
+    --md-primary-bg-color: #F4F0EA;
+    --md-primary-fg-color: #114A5D;
+    
+    /* Code block theming */
+    --md-code-fg-color: red;
+    [data-md-color-scheme=default] {
+        --md-code-bg-color: #E3DACD;
+    }
+
+    /* Tables, blockquotes, etc. */
+    --md-table-row-border-color: #e0e0e0;
+    --md-admonition-bg-color: #f8f8f8;
+    --md-admonition-title-fg-color: #373737;
+    --md-default-fg-color--light: #000;
+
+    --md-typeset-a-color: #000;
+    --md-accent-fg-color: #3286BE;
+
+    --md-code-fg-color: #000;
+}
+
+body {
+  background: #F4F0EA;
+}
+
+@media screen and (min-width: 60em) {
+    .md-nav--secondary .md-nav__title {
+        background: #F4F0EA;
+        box-shadow: 0 0 .4rem .4rem #F4F0EA;
+    }
+}
+
+@media screen and (min-width: 60em) {
+    .md-nav--primary .md-nav__title {
+        background: #F4F0EA;
+        box-shadow: 0 0 .4rem .4rem #F4F0EA;
+    }
+}
