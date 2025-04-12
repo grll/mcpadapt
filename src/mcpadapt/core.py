@@ -276,16 +276,16 @@ if __name__ == "__main__":
     with MCPAdapt(
         StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
         DummyAdapter(),
-    ) as smolagents_tools:
-        print(smolagents_tools)
-        print(smolagents_tools[0].forward({"text": "hello"}))
+    ) as dummy_tools:
+        print(dummy_tools)
+        print(dummy_tools[0]({"text": "hello"}))
 
     async def main():
         async with MCPAdapt(
             StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
             DummyAdapter(),
-        ) as smolagents_tools:
-            print(smolagents_tools)
-            print(smolagents_tools[0].forward({"text": "hello"}))
+        ) as dummy_tools:
+            print(dummy_tools)
+            print(await dummy_tools[0]({"text": "hello"}))
 
     asyncio.run(main())
