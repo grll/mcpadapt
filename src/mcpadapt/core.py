@@ -7,7 +7,7 @@ basic interfaces and classes for adapting tools from MCP to the desired Agent fr
 import asyncio
 import threading
 from abc import ABC, abstractmethod
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from functools import partial
 from typing import Any, Callable, Coroutine
 
@@ -139,7 +139,10 @@ class MCPAdapt:
 
     def __init__(
         self,
-        serverparams: StdioServerParameters | dict[str, Any],
+        serverparams: StdioServerParameters
+        | dict[str, Any]
+        | list[StdioServerParameters]
+        | list[dict[str, Any]],
         adapter: ToolAdapter,
         connect_timeout: int = 30,
     ):
@@ -147,42 +150,46 @@ class MCPAdapt:
         Manage the MCP server / client lifecycle and expose tools adapted with the adapter.
 
         Args:
-            serverparams (StdioServerParameters | dict[str, Any]): MCP server parameters (stdio or sse).
+            serverparams (StdioServerParameters | dict[str, Any] | list[StdioServerParameters | dict[str, Any]):
+                MCP server parameters (stdio or sse). Can be a list of you want to connect multiple MCPs at once.
             adapter (ToolAdapter): Adapter to use to convert MCP tools call into agentic framework tools.
             connect_timeout (int): Connection timeout in seconds to the mcp server (default is 30s).
 
         Raises:
             TimeoutError: When the connection to the mcp server time out.
         """
-        # attributes we receive from the user.
-        self.serverparams = serverparams
+
+        if isinstance(serverparams, list):
+            self.serverparams = serverparams
+        else:
+            self.serverparams = [serverparams]
+
         self.adapter = adapter
 
         # session and tools get set by the async loop during initialization.
-        self.session: ClientSession | None = None
-        self.mcp_tools: list[mcp.types.Tool] | None = None
+        self.sessions: list[ClientSession] = []
+        self.mcp_tools: list[mcp.types.Tool] = []
 
         # all attributes used to manage the async loop and separate thread.
         self.loop = asyncio.new_event_loop()
         self.task = None
+
         self.ready = threading.Event()
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
 
-        # start the loop in a separate thread and wait till ready synchronously.
-        self.thread.start()
-        # check connection to mcp server is ready
-        if not self.ready.wait(timeout=connect_timeout):
-            raise TimeoutError(
-                f"Couldn't connect to the MCP server after {connect_timeout} seconds"
-            )
+        self.connect_timeout = connect_timeout
 
     def _run_loop(self):
         """Runs the event loop in a separate thread (for synchronous usage)."""
         asyncio.set_event_loop(self.loop)
 
         async def setup():
-            async with mcptools(self.serverparams) as (session, tools):
-                self.session, self.mcp_tools = session, tools
+            async with AsyncExitStack() as stack:
+                connections = [
+                    await stack.enter_async_context(mcptools(params))
+                    for params in self.serverparams
+                ]
+                self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
                 self.ready.set()  # Signal initialization is complete
                 await asyncio.Event().wait()  # Keep session alive until stopped
 
@@ -202,19 +209,20 @@ class MCPAdapt:
         see :meth:`atools`.
 
         """
-        if not self.session:
+        if not self.sessions:
             raise RuntimeError("Session not initialized")
 
         def _sync_call_tool(
-            name: str, arguments: dict | None = None
+            session, name: str, arguments: dict | None = None
         ) -> mcp.types.CallToolResult:
             return asyncio.run_coroutine_threadsafe(
-                self.session.call_tool(name, arguments), self.loop
+                session.call_tool(name, arguments), self.loop
             ).result()
 
         return [
-            self.adapter.adapt(partial(_sync_call_tool, tool.name), tool)
-            for tool in self.mcp_tools
+            self.adapter.adapt(partial(_sync_call_tool, session, tool.name), tool)
+            for session, tools in zip(self.sessions, self.mcp_tools)
+            for tool in tools
         ]
 
     def close(self):
@@ -225,6 +233,14 @@ class MCPAdapt:
         self.loop.close()  # we won't be using the loop anymore we can safely close it
 
     def __enter__(self):
+        self.thread.start()
+
+        # check connection to mcp server is ready
+        if not self.ready.wait(timeout=self.connect_timeout):
+            raise TimeoutError(
+                f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
+            )
+
         return self.tools()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -241,13 +257,21 @@ class MCPAdapt:
         see :meth:`atools`.
         """
         return [
-            self.adapter.async_adapt(partial(self.session.call_tool, tool.name), tool)
-            for tool in self.mcp_tools
+            self.adapter.async_adapt(partial(session.call_tool, tool.name), tool)
+            for session, tools in zip(self.sessions, self.mcp_tools)
+            for tool in tools
         ]
 
     async def __aenter__(self) -> list[Any]:
-        self._ctxmanager = mcptools(self.serverparams)
-        self.session, self.tools = await self._ctxmanager.__aenter__()
+        self._ctxmanager = AsyncExitStack()
+
+        connections = [
+            await self._ctxmanager.enter_async_context(mcptools(params))
+            for params in self.serverparams
+        ]
+
+        self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
+
         return self.atools()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
@@ -274,18 +298,26 @@ if __name__ == "__main__":
             return afunc
 
     with MCPAdapt(
-        StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
+        [
+            StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
+            StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
+        ],
         DummyAdapter(),
     ) as dummy_tools:
         print(dummy_tools)
         print(dummy_tools[0]({"text": "hello"}))
+        print(dummy_tools[1]({"text": "world"}))
 
     async def main():
         async with MCPAdapt(
-            StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
+            [
+                StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
+                StdioServerParameters(command="uv", args=["run", "src/echo.py"]),
+            ],
             DummyAdapter(),
         ) as dummy_tools:
             print(dummy_tools)
             print(await dummy_tools[0]({"text": "hello"}))
+            print(await dummy_tools[1]({"text": "world"}))
 
     asyncio.run(main())
