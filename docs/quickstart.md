@@ -92,6 +92,26 @@ To use SSE, simply provide a configuration dictionary instead of StdioServerPara
 
 These parameters are passed directly to the MCP Python SDK's SSE client. For more details, see the [official MCP Python SDK documentation](https://github.com/modelcontextprotocol/python-sdk/blob/c2ca8e03e046908935d089a2ceed4e80b0c29a24/src/mcp/client/sse.py#L22C11-L22C21).
 
+### Multiple MCP Servers
+
+In all cases, you can provide multiple MCP Server parameters as a list:
+
+```python
+from mcp import StdioServerParameters
+from mcpadapt.core import MCPAdapt
+from mcpadapt.smolagents_adapter import SmolAgentsAdapter
+
+with MCPAdapt(
+    [
+        StdioServerParameters(command="uv", args=["run", "src/echo1.py"]),
+        StdioServerParameters(command="uv", args=["run", "src/echo2.py"]),
+    ],
+    <AgenticFramework>Adapter(),
+) as tools:
+    # tools is now a flattened list of tools from the 2 MCP servers.
+    ...
+```
+
 ## Examples
 
 We provide guided examples of usage for each framework in their respective guides:
