@@ -9,7 +9,7 @@ import threading
 from abc import ABC, abstractmethod
 from contextlib import AsyncExitStack, asynccontextmanager
 from functools import partial
-from typing import Any, Callable, Coroutine
+from typing import Any, AsyncGenerator, Callable, Coroutine
 
 import mcp
 from mcp import ClientSession, StdioServerParameters
@@ -71,7 +71,7 @@ class ToolAdapter(ABC):
 @asynccontextmanager
 async def mcptools(
     serverparams: StdioServerParameters | dict[str, Any],
-) -> tuple[ClientSession, list[mcp.types.Tool]]:
+) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]]]:
     """Async context manager that yields tools from an MCP server.
 
     Note: the session can be then used to call tools on the MCP server but it's async.
@@ -141,8 +141,7 @@ class MCPAdapt:
         self,
         serverparams: StdioServerParameters
         | dict[str, Any]
-        | list[StdioServerParameters]
-        | list[dict[str, Any]],
+        | list[StdioServerParameters | dict[str, Any]],
         adapter: ToolAdapter,
         connect_timeout: int = 30,
     ):
