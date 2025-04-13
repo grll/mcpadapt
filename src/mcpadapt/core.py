@@ -71,7 +71,7 @@ class ToolAdapter(ABC):
 @asynccontextmanager
 async def mcptools(
     serverparams: StdioServerParameters | dict[str, Any],
-) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]]]:
+) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]], None]:
     """Async context manager that yields tools from an MCP server.
 
     Note: the session can be then used to call tools on the MCP server but it's async.
