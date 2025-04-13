@@ -99,7 +99,7 @@ In all cases, you can provide multiple MCP Server parameters as a list:
 ```python
 from mcp import StdioServerParameters
 from mcpadapt.core import MCPAdapt
-from mcpadapt.smolagents_adapter import SmolAgentsAdapter
+from mcpadapt.<framework>_adapter import <Framework>Adapter
 
 with MCPAdapt(
     [
