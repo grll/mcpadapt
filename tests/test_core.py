@@ -61,6 +61,7 @@ def echo_server_sse_script():
         '''
     )
 
+
 @pytest.fixture
 async def echo_sse_server(echo_server_sse_script):
     import subprocess
@@ -81,6 +82,7 @@ async def echo_sse_server(echo_server_sse_script):
         process.kill()
         process.wait()
 
+
 def test_basic_sync(echo_server_script):
     with MCPAdapt(
         StdioServerParameters(
@@ -90,6 +92,7 @@ def test_basic_sync(echo_server_script):
     ) as tools:
         assert len(tools) == 1
         assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
+
 
 def test_basic_sync_multiple_tools(echo_server_script):
     with MCPAdapt(
@@ -107,6 +110,7 @@ def test_basic_sync_multiple_tools(echo_server_script):
         assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
         assert tools[1]({"text": "world"}).content[0].text == "Echo: world"
 
+
 async def test_basic_async(echo_server_script):
     async with MCPAdapt(
         StdioServerParameters(
@@ -117,7 +121,8 @@ async def test_basic_async(echo_server_script):
         assert len(tools) == 1
         mcp_tool_call_result = await tools[0]({"text": "hello"})
         assert mcp_tool_call_result.content[0].text == "Echo: hello"
-    
+
+
 async def test_basic_async_multiple_tools(echo_server_script):
     async with MCPAdapt(
         [
@@ -136,6 +141,7 @@ async def test_basic_async_multiple_tools(echo_server_script):
         mcp_tool_call_result = await tools[1]({"text": "world"})
         assert mcp_tool_call_result.content[0].text == "Echo: world"
 
+
 def test_basic_sync_sse(echo_sse_server):
     sse_serverparams = echo_sse_server
     with MCPAdapt(
@@ -144,6 +150,7 @@ def test_basic_sync_sse(echo_sse_server):
     ) as tools:
         assert len(tools) == 1
         assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
+
 
 def test_basic_sync_multiple_sse(echo_sse_server):
     sse_serverparams = echo_sse_server
@@ -155,6 +162,7 @@ def test_basic_sync_multiple_sse(echo_sse_server):
         assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
         assert tools[1]({"text": "world"}).content[0].text == "Echo: world"
 
+
 async def test_basic_async_sse(echo_sse_server):
     sse_serverparams = echo_sse_server
     async with MCPAdapt(
@@ -164,6 +172,7 @@ async def test_basic_async_sse(echo_sse_server):
         assert len(tools) == 1
         mcp_tool_call_result = await tools[0]({"text": "hello"})
         assert mcp_tool_call_result.content[0].text == "Echo: hello"
+
 
 async def test_basic_async_multiple_sse(echo_sse_server):
     sse_serverparams = echo_sse_server
