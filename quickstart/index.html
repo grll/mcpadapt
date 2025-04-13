@@ -336,6 +336,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#multiple-mcp-servers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multiple MCP Servers
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -732,6 +741,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#multiple-mcp-servers" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multiple MCP Servers
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -872,6 +890,22 @@
 </tbody>
 </table>
 <p>These parameters are passed directly to the MCP Python SDK's SSE client. For more details, see the <a href="https://github.com/modelcontextprotocol/python-sdk/blob/c2ca8e03e046908935d089a2ceed4e80b0c29a24/src/mcp/client/sse.py#L22C11-L22C21">official MCP Python SDK documentation</a>.</p>
+<h3 id="multiple-mcp-servers">Multiple MCP Servers</h3>
+<p>In all cases, you can provide multiple MCP Server parameters as a list:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">StdioServerParameters</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mcpadapt.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCPAdapt</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">mcpadapt.</span><span class="o">&lt;</span><span class="n">framework</span><span class="o">&gt;</span><span class="n">_adapter</span> <span class="kn">import</span><span class="w"> </span><span class="o">&lt;</span><span class="n">Framework</span><span class="o">&gt;</span><span class="n">Adapter</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">with</span> <span class="n">MCPAdapt</span><span class="p">(</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="p">[</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="n">StdioServerParameters</span><span class="p">(</span><span class="n">command</span><span class="o">=</span><span class="s2">&quot;uv&quot;</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">,</span> <span class="s2">&quot;src/echo1.py&quot;</span><span class="p">]),</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>        <span class="n">StdioServerParameters</span><span class="p">(</span><span class="n">command</span><span class="o">=</span><span class="s2">&quot;uv&quot;</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">,</span> <span class="s2">&quot;src/echo2.py&quot;</span><span class="p">]),</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="p">],</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="o">&lt;</span><span class="n">AgenticFramework</span><span class="o">&gt;</span><span class="n">Adapter</span><span class="p">(),</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="p">)</span> <span class="k">as</span> <span class="n">tools</span><span class="p">:</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="c1"># tools is now a flattened list of tools from the 2 MCP servers.</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="o">...</span>
+</span></code></pre></div>
 <h2 id="examples">Examples</h2>
 <p>We provide guided examples of usage for each framework in their respective guides:</p>
 <ul>
