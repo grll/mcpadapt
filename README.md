@@ -93,7 +93,27 @@ with MCPAdapt(
 MCP Adapt supports Smolagents, Langchain, CrewAI, google-genai [pydantic.dev, Llammaindex and more...]*.
 *coming soon.
 
-See our examples for more details on how to use.
+Note: you can also specify multiple mcp servers as in:
+
+```python
+from mcp import StdioServerParameters
+from mcpadapt.core import MCPAdapt
+from mcpadapt.smolagents_adapter import SmolAgentsAdapter
+
+with MCPAdapt(
+    [
+        StdioServerParameters(command="uv", args=["run", "src/echo1.py"]),
+        StdioServerParameters(command="uv", args=["run", "src/echo2.py"]),
+    ],
+    SmolAgentsAdapter(),
+) as tools:
+    # tools is now a flattened list of tools from the 2 MCP servers.
+    ...
+```
+
+We also support async if the underlying agentic framework supports it.
+
+See our [examples]() for more details on how to use.
 
 ## Contribute
 
