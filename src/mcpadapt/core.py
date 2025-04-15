@@ -167,7 +167,7 @@ class MCPAdapt:
 
         # session and tools get set by the async loop during initialization.
         self.sessions: list[ClientSession] = []
-        self.mcp_tools: list[mcp.types.Tool] = []
+        self.mcp_tools: list[list[mcp.types.Tool]] = []
 
         # all attributes used to manage the async loop and separate thread.
         self.loop = asyncio.new_event_loop()
