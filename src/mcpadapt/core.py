@@ -8,6 +8,7 @@ import asyncio
 import threading
 from abc import ABC, abstractmethod
 from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import timedelta
 from functools import partial
 from typing import Any, AsyncGenerator, Callable, Coroutine
 
@@ -71,6 +72,7 @@ class ToolAdapter(ABC):
 @asynccontextmanager
 async def mcptools(
     serverparams: StdioServerParameters | dict[str, Any],
+    client_session_timeout_seconds: float | None = 5,
 ) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]], None]:
     """Async context manager that yields tools from an MCP server.
 
@@ -81,7 +83,7 @@ async def mcptools(
         serverparams: Parameters passed to either the stdio client or sse client.
             * if StdioServerParameters, run the MCP server using the stdio protocol.
             * if dict, assume the dict corresponds to parameters to an sse MCP server.
-
+        client_session_timeout_seconds: Timeout for MCP ClientSession HTTP calls
     Yields:
         A tuple of (MCP Client Session, list of MCP tools) available on the MCP server.
 
@@ -99,7 +101,7 @@ async def mcptools(
         )
 
     async with client as (read, write):
-        async with ClientSession(read, write) as session:
+        async with ClientSession(read, write, timedelta(seconds=client_session_timeout_seconds)) as session:
             # Initialize the connection and get the tools from the mcp server
             await session.initialize()
             tools = await session.list_tools()
