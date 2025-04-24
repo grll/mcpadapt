@@ -84,6 +84,7 @@ async def mcptools(
             * if StdioServerParameters, run the MCP server using the stdio protocol.
             * if dict, assume the dict corresponds to parameters to an sse MCP server.
         client_session_timeout_seconds: Timeout for MCP ClientSession HTTP calls
+
     Yields:
         A tuple of (MCP Client Session, list of MCP tools) available on the MCP server.
 
