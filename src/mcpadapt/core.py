@@ -101,7 +101,7 @@ async def mcptools(
         )
 
     async with client as (read, write):
-        async with ClientSession(read, write, timedelta(seconds=client_session_timeout_seconds)) as session:
+        async with ClientSession(read, write, timedelta(seconds=client_session_timeout_seconds) if client_session_timeout_seconds else None) as session:
             # Initialize the connection and get the tools from the mcp server
             await session.initialize()
             tools = await session.list_tools()
