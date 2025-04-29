@@ -102,11 +102,10 @@ async def mcptools(
         )
 
     timeout = None
-    if client_session_timeout_seconds is not None:
-        if isinstance(client_session_timeout_seconds, float):
-            timeout = timedelta(seconds=client_session_timeout_seconds)
-        elif isinstance(client_session_timeout_seconds, timedelta):
-            timeout = client_session_timeout_seconds
+    if isinstance(client_session_timeout_seconds, float):
+        timeout = timedelta(seconds=client_session_timeout_seconds)
+    elif isinstance(client_session_timeout_seconds, timedelta):
+        timeout = client_session_timeout_seconds
 
     async with client as (read, write):
         async with ClientSession(
