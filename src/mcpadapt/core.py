@@ -72,7 +72,7 @@ class ToolAdapter(ABC):
 @asynccontextmanager
 async def mcptools(
     serverparams: StdioServerParameters | dict[str, Any],
-    client_session_timeout_seconds: float | None = 5,
+    client_session_timeout_seconds: float | timedelta | None = 5,
 ) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]], None]:
     """Async context manager that yields tools from an MCP server.
 
@@ -101,8 +101,19 @@ async def mcptools(
             f"Invalid serverparams, expected StdioServerParameters or dict found `{type(serverparams)}`"
         )
 
+    timeout = None
+    if client_session_timeout_seconds is not None:
+        if isinstance(client_session_timeout_seconds, float):
+            timeout = timedelta(seconds=client_session_timeout_seconds)
+        elif isinstance(client_session_timeout_seconds, timedelta):
+            timeout = client_session_timeout_seconds
+
     async with client as (read, write):
-        async with ClientSession(read, write, timedelta(seconds=client_session_timeout_seconds) if client_session_timeout_seconds else None) as session:
+        async with ClientSession(
+            read,
+            write,
+            timeout,
+        ) as session:
             # Initialize the connection and get the tools from the mcp server
             await session.initialize()
             tools = await session.list_tools()
