@@ -61,7 +61,23 @@ class CrewAIAdapter(ToolAdapter):
             def _run(self, *args: Any, **kwargs: Any) -> Any:
                 print("args", args)
                 print("kwargs", kwargs)
-                return func(kwargs).content[0].text  # type: ignore
+
+                # First validate inputs against the Pydantic model
+                # This will raise ValueError for any None values in required fields
+                try:
+                    # Validate using the args_schema (Pydantic model)
+                    validated_data = self.args_schema(**kwargs)
+                except Exception as e:
+                    # Re-raise as ValueError to match expected test behavior
+                    raise ValueError(f"Validation error: {e}")
+
+                # Convert back to dict and filter out None values from optional parameters
+                validated_dict = validated_data.model_dump()
+                filtered_kwargs = {
+                    k: v for k, v in validated_dict.items() if v is not None
+                }
+
+                return func(filtered_kwargs).content[0].text  # type: ignore
 
             def _generate_description(self):
                 args_schema = {
