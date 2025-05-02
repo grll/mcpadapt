@@ -128,11 +128,12 @@ def create_model_from_json_schema(
 
             # Handle list-type (multiple allowed types in JSON Schema)
             if isinstance(json_type, list):
-                # Convert to Union type
+                # Convert to Union type (consistent with anyOf handling)
                 types = []
                 for t in json_type:
-                    mapped_type = json_type_mapping.get(t, Any)
-                    types.append(mapped_type)
+                    if t != "null":  # Exclude null types as in anyOf handling
+                        mapped_type = json_type_mapping.get(t, Any)
+                        types.append(mapped_type)
 
                 if len(types) > 1:
                     field_type = Union[tuple(types)]  # type: ignore
