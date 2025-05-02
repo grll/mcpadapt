@@ -125,7 +125,22 @@ def create_model_from_json_schema(
         else:
             # Simple types
             json_type = field_schema.get("type", "string")
-            field_type = json_type_mapping.get(json_type, Any)  # type: ignore
+
+            # Handle list-type (multiple allowed types in JSON Schema)
+            if isinstance(json_type, list):
+                # Convert to Union type
+                types = []
+                for t in json_type:
+                    mapped_type = json_type_mapping.get(t, Any)
+                    types.append(mapped_type)
+
+                if len(types) > 1:
+                    field_type = Union[tuple(types)]  # type: ignore
+                else:
+                    field_type = types[0] if types else Any
+            else:
+                # Original code for simple types
+                field_type = json_type_mapping.get(json_type, Any)  # type: ignore
 
         # Handle optionality and default values
         default = field_schema.get("default")
