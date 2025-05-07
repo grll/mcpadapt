@@ -15,7 +15,10 @@ from crewai.tools import BaseTool  # type: ignore
 from pydantic import BaseModel
 
 from mcpadapt.core import ToolAdapter
-from mcpadapt.utils.modeling import create_model_from_json_schema
+from mcpadapt.utils.modeling import (
+    create_model_from_json_schema, 
+    resolve_refs_and_remove_defs
+)
 
 json_type_mapping: dict[str, Type] = {
     "string": str,
@@ -51,6 +54,9 @@ class CrewAIAdapter(ToolAdapter):
         Returns:
             A CrewAI tool.
         """
+        mcp_tool.inputSchema = resolve_refs_and_remove_defs(
+            mcp_tool.inputSchema
+        )
         ToolInput = create_model_from_json_schema(mcp_tool.inputSchema)
 
         class CrewAIMCPTool(BaseTool):
