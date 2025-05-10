@@ -15,7 +15,6 @@ import mcp
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
-from requests import session
 
 
 class ToolAdapter(ABC):
