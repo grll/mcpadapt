@@ -15,6 +15,7 @@ import mcp
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
+from requests import session
 
 
 class ToolAdapter(ABC):
@@ -128,6 +129,12 @@ class MCPAdapt:
     >>> with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentAdapter()) as tools:
     >>>     print(tools)
 
+    >>> # sync usage by start ... close pattern
+    >>> adapter = MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentAdapter())
+    >>> adapter.start()
+    >>> print(adapter.tools()) # get latest tools
+    >>> adapter.close()
+
     >>> # async usage
     >>> async with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentAdapter()) as tools:
     >>>     print(tools)
@@ -204,6 +211,8 @@ class MCPAdapt:
         This is what is yielded if used as a context manager otherwise you can access it
         directly via this method.
 
+        Only use this when you start the client in synchronous context or by :meth:`start`.
+
         An equivalent async method is available if your Agent framework supports it:
         see :meth:`atools`.
 
@@ -218,11 +227,37 @@ class MCPAdapt:
                 session.call_tool(name, arguments), self.loop
             ).result()
 
+        # refresh tools
+        mcp_tools: list[list[mcp.types.Tool]] = []
+
+        async def _list_tools(session: ClientSession) -> list[mcp.types.Tool]:
+            return (await session.list_tools()).tools
+
+        for session in self.sessions:
+            mcp_tools.extend(
+                [
+                    asyncio.run_coroutine_threadsafe(
+                        _list_tools(session), self.loop
+                    ).result(timeout=self.connect_timeout)
+                ]
+            )
+        self.mcp_tools = mcp_tools
+
         return [
             self.adapter.adapt(partial(_sync_call_tool, session, tool.name), tool)
             for session, tools in zip(self.sessions, self.mcp_tools)
             for tool in tools
         ]
+
+    def start(self):
+        """Start the client in synchronous context."""
+        self.thread.start()
+
+        # check connection to mcp server is ready
+        if not self.ready.wait(timeout=self.connect_timeout):
+            raise TimeoutError(
+                f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
+            )
 
     def close(self):
         """Clean up resources and stop the client."""
@@ -232,29 +267,27 @@ class MCPAdapt:
         self.loop.close()  # we won't be using the loop anymore we can safely close it
 
     def __enter__(self):
-        self.thread.start()
-
-        # check connection to mcp server is ready
-        if not self.ready.wait(timeout=self.connect_timeout):
-            raise TimeoutError(
-                f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
-            )
-
+        self.start()
         return self.tools()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
     # -- add support for async context manager as well if the agent framework supports it.
-    def atools(self) -> list[Any]:
+    async def atools(self) -> list[Any]:
         """Returns the tools from the MCP server adapted to the desired Agent framework.
 
         This is what is yielded if used as an async context manager otherwise you can
         access it directly via this method.
 
-        An equivalent async method is available if your Agent framework supports it:
-        see :meth:`atools`.
+        Only use this when you start the client in asynchronous context.
+
+        An equivalent sync method is available if your Agent framework supports it:
+        see :meth:`tools`.
         """
+        # refresh tools
+        self.mcp_tools = [(await s.list_tools()).tools for s in self.sessions]
+
         return [
             self.adapter.async_adapt(partial(session.call_tool, tool.name), tool)
             for session, tools in zip(self.sessions, self.mcp_tools)
@@ -271,7 +304,7 @@ class MCPAdapt:
 
         self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
 
-        return self.atools()
+        return await self.atools()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._ctxmanager.__aexit__(exc_type, exc_val, exc_tb)
