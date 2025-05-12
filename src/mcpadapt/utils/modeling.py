@@ -80,7 +80,9 @@ def create_model_from_json_schema(
                     description=field_schema.get("description", ""),
                     title=field_schema.get("title", ""),
                     items=field_schema.get("items", None),
-                    anyOf=field_schema.get("anyOf", None),
+                    anyOf=field_schema.get("anyOf", []),
+                    enum=field_schema.get("enum", None),
+                    properties=field_schema.get("properties", {}),
                 ),
             )
 
