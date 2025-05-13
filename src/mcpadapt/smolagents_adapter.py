@@ -21,6 +21,7 @@ from mcpadapt.core import ToolAdapter
 
 logger = logging.getLogger(__name__)
 
+
 def _sanitize_function_name(name):
     """
     A function to sanitize function names to be used as a tool name.
@@ -42,6 +43,7 @@ def _sanitize_function_name(name):
 
     return name
 
+
 class SmolAgentsAdapter(ToolAdapter):
     """Adapter for the `smolagents` framework.
 
@@ -50,7 +52,7 @@ class SmolAgentsAdapter(ToolAdapter):
 
     Warning: if the mcp tool name is a python keyword, starts with digits or contains
     dashes, the tool name will be sanitized to become a valid python function name.
-    
+
     """
 
     def adapt(

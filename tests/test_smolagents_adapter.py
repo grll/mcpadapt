@@ -136,6 +136,7 @@ def test_optional_sync(echo_server_optional_script):
         assert tools[2].name == "echo_tool_union_none"
         assert tools[2](text="hello") == "Echo: hello"
 
+
 def test_tool_name_with_dashes():
     mcp_server_script = dedent(
         '''
@@ -159,7 +160,7 @@ def test_tool_name_with_dashes():
     ) as tools:
         assert len(tools) == 1
         assert tools[0].name == "echo_tool"
-        assert tools[0].invoke("hello") == "Echo: hello"
+        assert tools[0](text="hello") == "Echo: hello"
 
 
 def test_tool_name_with_keyword():
@@ -185,4 +186,4 @@ def test_tool_name_with_keyword():
     ) as tools:
         assert len(tools) == 1
         assert tools[0].name == "def_"
-        assert tools[0].invoke("hello") == "Echo: hello"
+        assert tools[0](text="hello") == "Echo: hello"
