@@ -1,6 +1,6 @@
 from textwrap import dedent
 from typing import Any, Callable, Coroutine
-
+import time
 import mcp
 import pytest
 from mcp import StdioServerParameters
@@ -39,6 +39,35 @@ def echo_server_script():
             """Echo the input text"""
             return f"Echo: {text}"
         
+        mcp.run()
+        '''
+    )
+
+
+@pytest.fixture
+def update_server_script():
+    return dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+        import threading
+        import time
+        
+        mcp = FastMCP("Echo Server")
+
+        @mcp.tool()
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            return f"Echo: {text}"
+        
+        def new_tool(text: str) -> str:
+            """New tool"""
+            return f"New: {text}"
+        
+        def update_tool():
+            time.sleep(5)
+            mcp.add_tool(new_tool)
+        
+        threading.Thread(target=update_tool).start()
         mcp.run()
         '''
     )
@@ -111,6 +140,30 @@ def test_basic_sync_multiple_tools(echo_server_script):
         assert tools[1]({"text": "world"}).content[0].text == "Echo: world"
 
 
+def test_basic_sync_update_tools(update_server_script):
+    adapter = MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", update_server_script]
+        ),
+        DummyAdapter(),
+    )
+    with adapter as tools:
+        assert len(tools) == 1
+        assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
+        # wait for tools update
+        time.sleep(10)
+        # get latest tools
+        tools = adapter.tools()
+        assert len(tools) == 2
+        # assert all tools are valid
+        res = (
+            tools[0]({"text": "hello"}).content[0].text,
+            tools[1]({"text": "hello"}).content[0].text,
+        )
+        assert "Echo: hello" in res
+        assert "New: hello" in res
+
+
 async def test_basic_async(echo_server_script):
     async with MCPAdapt(
         StdioServerParameters(
@@ -140,6 +193,30 @@ async def test_basic_async_multiple_tools(echo_server_script):
         assert mcp_tool_call_result.content[0].text == "Echo: hello"
         mcp_tool_call_result = await tools[1]({"text": "world"})
         assert mcp_tool_call_result.content[0].text == "Echo: world"
+
+
+async def test_basic_async_update_tools(update_server_script):
+    adapter = MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", update_server_script]
+        ),
+        DummyAdapter(),
+    )
+    async with adapter as tools:
+        assert len(tools) == 1
+        assert (await tools[0]({"text": "hello"})).content[0].text == "Echo: hello"
+        # wait for tools update
+        time.sleep(10)
+        # get latest tools
+        tools = await adapter.atools()
+        assert len(tools) == 2
+        # assert all tools are valid
+        res = (
+            (await tools[0]({"text": "hello"})).content[0].text,
+            (await tools[1]({"text": "hello"})).content[0].text,
+        )
+        assert "Echo: hello" in res
+        assert "New: hello" in res
 
 
 def test_basic_sync_sse(echo_sse_server):
