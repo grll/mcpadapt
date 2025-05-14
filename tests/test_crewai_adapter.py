@@ -12,12 +12,12 @@ from mcpadapt.crewai_adapter import CrewAIAdapter
 
 def extract_and_eval_dict(text):
     # Match the first outermost curly brace block
-    match = re.search(r'\{.*\}', text, re.DOTALL)
+    match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         raise ValueError("No dictionary-like structure found in the string.")
 
     dict_str = match.group(0)
-    
+
     try:
         # Safer than eval for parsing literals
         parsed_dict = ast.literal_eval(dict_str)
@@ -47,7 +47,7 @@ def echo_server_script():
 @pytest.fixture
 def custom_script_with_custom_arguments():
     return dedent(
-        '''
+        """
         from mcp.server.fastmcp import FastMCP
         from typing import Literal
         from enum import Enum
@@ -69,14 +69,14 @@ def custom_script_with_custom_arguments():
             pass
 
         mcp.run()
-        '''
+        """
     )
 
 
 @pytest.fixture
 def custom_script_with_custom_list():
     return dedent(
-        '''
+        """
         from mcp.server.fastmcp import FastMCP
         from pydantic import BaseModel
 
@@ -94,7 +94,7 @@ def custom_script_with_custom_list():
             pass
 
         mcp.run()
-        '''
+        """
     )
 
 
@@ -187,12 +187,7 @@ def test_basic_sync_custom_arguments(custom_script_with_custom_arguments):
     with MCPAdapt(
         StdioServerParameters(
             command="uv",
-            args=[
-                "run",
-                "python",
-                "-c",
-                custom_script_with_custom_arguments
-            ]
+            args=["run", "python", "-c", custom_script_with_custom_arguments],
         ),
         CrewAIAdapter(),
     ) as tools:
@@ -210,11 +205,10 @@ def test_basic_sync_custom_arguments(custom_script_with_custom_arguments):
         # Union tests
         assert "anyOf" in tools_dict["properties"]["env"]
         assert tools_dict["properties"]["env"]["anyOf"] != []
-        types = [
-            opt.get("type") for opt in tools_dict["properties"]["env"]["anyOf"]
-        ]
+        types = [opt.get("type") for opt in tools_dict["properties"]["env"]["anyOf"]]
         assert "null" in types
         assert "string" in types
+
 
 # Raises KeyError
 # if the pydantic objects list is not correctly resolved with $ref handling
@@ -222,13 +216,7 @@ def test_basic_sync_custom_arguments(custom_script_with_custom_arguments):
 def test_basic_sync_custom_list(custom_script_with_custom_list):
     with MCPAdapt(
         StdioServerParameters(
-            command="uv",
-            args=[
-                "run",
-                "python",
-                "-c",
-                custom_script_with_custom_list
-            ]
+            command="uv", args=["run", "python", "-c", custom_script_with_custom_list]
         ),
         CrewAIAdapter(),
     ) as tools:
