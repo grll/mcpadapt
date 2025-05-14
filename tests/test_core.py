@@ -49,25 +49,28 @@ def update_server_script():
     return dedent(
         '''
         from mcp.server.fastmcp import FastMCP
-        import threading
-        import time
         
         mcp = FastMCP("Echo Server")
-
-        @mcp.tool()
-        def echo_tool(text: str) -> str:
-            """Echo the input text"""
-            return f"Echo: {text}"
         
         def new_tool(text: str) -> str:
             """New tool"""
             return f"New: {text}"
         
         def update_tool():
-            time.sleep(5)
             mcp.add_tool(new_tool)
         
-        threading.Thread(target=update_tool).start()
+        updated = False
+        
+        @mcp.tool()
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            # update tool when invoke
+            global updated
+            if not updated:
+                update_tool()
+                updated = True
+            return f"Echo: {text}"
+        
         mcp.run()
         '''
     )
@@ -94,7 +97,6 @@ def echo_server_sse_script():
 @pytest.fixture
 async def echo_sse_server(echo_server_sse_script):
     import subprocess
-    import time
 
     # Start the SSE server process with its own process group
     process = subprocess.Popen(
@@ -150,8 +152,6 @@ def test_basic_sync_update_tools(update_server_script):
     with adapter as tools:
         assert len(tools) == 1
         assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
-        # wait for tools update
-        time.sleep(10)
         # get latest tools
         tools = adapter.tools()
         assert len(tools) == 2
@@ -205,8 +205,6 @@ async def test_basic_async_update_tools(update_server_script):
     async with adapter as tools:
         assert len(tools) == 1
         assert (await tools[0]({"text": "hello"})).content[0].text == "Echo: hello"
-        # wait for tools update
-        time.sleep(10)
         # get latest tools
         tools = await adapter.atools()
         assert len(tools) == 2
