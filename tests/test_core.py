@@ -1,6 +1,7 @@
+import time
 from textwrap import dedent
 from typing import Any, Callable, Coroutine
-import time
+
 import mcp
 import pytest
 from mcp import StdioServerParameters
@@ -108,6 +109,44 @@ async def echo_sse_server(echo_server_sse_script):
 
     try:
         yield {"url": "http://127.0.0.1:8000/sse"}
+    finally:
+        # Clean up the process when test is done
+        process.kill()
+        process.wait()
+
+
+@pytest.fixture
+def echo_server_streamable_http_script():
+    return dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+        
+        mcp = FastMCP("Echo Server", host="127.0.0.1", port=8000, stateless_http=True, json_response=True)
+        
+        @mcp.tool()
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            return f"Echo: {text}"
+
+        mcp.run("streamable-http")
+        '''
+    )
+
+
+@pytest.fixture
+async def echo_streamable_http_server(echo_server_streamable_http_script):
+    import subprocess
+
+    # Start the SSE server process with its own process group
+    process = subprocess.Popen(
+        ["python", "-c", echo_server_streamable_http_script],
+    )
+
+    # Give the server a moment to start up
+    time.sleep(1)
+
+    try:
+        yield {"url": "http://127.0.0.1:8000/mcp", "transport": "streamable-http"}
     finally:
         # Clean up the process when test is done
         process.kill()
@@ -260,3 +299,23 @@ async def test_basic_async_multiple_sse(echo_sse_server):
         assert mcp_tool_call_result.content[0].text == "Echo: hello"
         mcp_tool_call_result = await tools[1]({"text": "world"})
         assert mcp_tool_call_result.content[0].text == "Echo: world"
+
+
+def test_basic_sync_streamable_http(echo_streamable_http_server):
+    http_serverparams = echo_streamable_http_server
+    with MCPAdapt(
+        http_serverparams,
+        DummyAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
+
+
+async def test_basic_async_streamable_http(echo_streamable_http_server):
+    http_serverparams = echo_streamable_http_server
+    async with MCPAdapt(
+        http_serverparams,
+        DummyAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert (await tools[0]({"text": "hello"})).content[0].text == "Echo: hello"
