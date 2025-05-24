@@ -259,7 +259,7 @@ def test_optional_sync(echo_server_optional_script):
 @pytest.fixture
 def mcp_server_that_rejects_none_script():
     return dedent(
-        '''
+        """
         import mcp.types as types
         from mcp.server.lowlevel import Server
         from mcp.server.stdio import stdio_server
@@ -322,40 +322,41 @@ def mcp_server_that_rejects_none_script():
                 )
 
         anyio.run(arun)
-        '''
+        """
     )
 
 
 def test_none_values_filtered_from_kwargs(mcp_server_that_rejects_none_script):
     """Test that None values are filtered out before being sent to MCP tool.
-    
+
     This test reproduces issue #46 where None values in kwargs cause MCP servers
     to reject the request with 'parameter is not of type string, is <nil>' error.
     """
     with MCPAdapt(
         StdioServerParameters(
-            command="uv", args=["run", "python", "-c", mcp_server_that_rejects_none_script]
+            command="uv",
+            args=["run", "python", "-c", mcp_server_that_rejects_none_script],
         ),
         CrewAIAdapter(),
     ) as tools:
         assert len(tools) == 1
         tool = tools[0]
         assert tool.name == "strict_tool"
-        
+
         # This should work - only required parameter
         result = tool.run(required="test")
         assert "Required: test" in result
-        
+
         # This should work - explicit non-None values
         result = tool.run(required="test", optional="value1", another_optional="value2")
         assert "Required: test" in result
         assert "Optional: value1" in result
         assert "Another: value2" in result
-        
+
         # After the fix - CrewAI passes None values but they are filtered out
         # before being sent to the MCP server if the schema doesn't allow null
         result = tool.run(required="test", optional=None, another_optional=None)
-        
+
         # The fix filters out None values, so the server receives only {"required": "test"}
         # and returns a successful response with None for the optional parameters
         assert "Required: test" in result

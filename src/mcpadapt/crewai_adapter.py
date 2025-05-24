@@ -63,11 +63,10 @@ class CrewAIAdapter(ToolAdapter):
             args_schema: Type[BaseModel] = ToolInput
 
             def _run(self, *args: Any, **kwargs: Any) -> Any:
-                
                 # Filter out None values if the schema doesn't allow null
                 filtered_kwargs: dict[str, Any] = {}
                 schema_properties = mcp_tool.inputSchema.get("properties", {})
-                
+
                 for key, value in kwargs.items():
                     if value is None and key in schema_properties:
                         prop_schema = schema_properties[key]
@@ -78,12 +77,15 @@ class CrewAIAdapter(ToolAdapter):
                                 filtered_kwargs[key] = value
                         elif "anyOf" in prop_schema:
                             # Check if any option allows null
-                            if any(opt.get("type") == "null" for opt in prop_schema["anyOf"]):
+                            if any(
+                                opt.get("type") == "null"
+                                for opt in prop_schema["anyOf"]
+                            ):
                                 filtered_kwargs[key] = value
                         # If neither case allows null, skip the None value
                     else:
                         filtered_kwargs[key] = value
-                
+
                 return func(filtered_kwargs).content[0].text  # type: ignore
 
             def _generate_description(self):
