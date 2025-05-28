@@ -16,6 +16,7 @@ import mcp
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamablehttp_client
 
 
 class ToolAdapter(ABC):
@@ -95,7 +96,15 @@ async def mcptools(
     if isinstance(serverparams, StdioServerParameters):
         client = stdio_client(serverparams)
     elif isinstance(serverparams, dict):
-        client = sse_client(**serverparams)
+        transport = serverparams.pop("transport", "sse")
+        if transport == "sse":
+            client = sse_client(**serverparams)
+        elif transport == "streamable-http":
+            client = streamablehttp_client(**serverparams)
+        else:
+            raise ValueError(
+                f"Invalid transport, expected sse or streamable-http found `{transport}`"
+            )
     else:
         raise ValueError(
             f"Invalid serverparams, expected StdioServerParameters or dict found `{type(serverparams)}`"
@@ -107,7 +116,7 @@ async def mcptools(
     elif isinstance(client_session_timeout_seconds, timedelta):
         timeout = client_session_timeout_seconds
 
-    async with client as (read, write):
+    async with client as (read, write, *_):
         async with ClientSession(
             read,
             write,
@@ -141,12 +150,22 @@ class MCPAdapt:
     >>> with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentAdapter()) as tools:
     >>>     print(tools)
 
+    >>> # sync usage by start ... close pattern
+    >>> adapter = MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentAdapter())
+    >>> adapter.start()
+    >>> print(adapter.tools()) # get latest tools
+    >>> adapter.close()
+
+    >>> # sync usage with streamable-http
+    >>> with MCPAdapt({"url": "http://127.0.0.1:8000/mcp", "transport": "streamable-http"}), SmolAgentAdapter()) as tools:
+    >>>     print(tools)
+
     >>> # async usage
     >>> async with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentAdapter()) as tools:
     >>>     print(tools)
 
     >>> # async usage with sse
-    >>> async with MCPAdapt({"host": "127.0.0.1", "port": 8000}, SmolAgentAdapter()) as tools:
+    >>> async with MCPAdapt({"url": "http://127.0.0.1:8000/sse"}, SmolAgentAdapter()) as tools:
     >>>     print(tools)
     """
 
@@ -217,6 +236,8 @@ class MCPAdapt:
         This is what is yielded if used as a context manager otherwise you can access it
         directly via this method.
 
+        Only use this when you start the client in synchronous context or by :meth:`start`.
+
         An equivalent async method is available if your Agent framework supports it:
         see :meth:`atools`.
 
@@ -231,11 +252,37 @@ class MCPAdapt:
                 session.call_tool(name, arguments), self.loop
             ).result()
 
+        # refresh tools
+        mcp_tools: list[list[mcp.types.Tool]] = []
+
+        async def _list_tools(session: ClientSession) -> list[mcp.types.Tool]:
+            return (await session.list_tools()).tools
+
+        for session in self.sessions:
+            mcp_tools.extend(
+                [
+                    asyncio.run_coroutine_threadsafe(
+                        _list_tools(session), self.loop
+                    ).result(timeout=self.connect_timeout)
+                ]
+            )
+        self.mcp_tools = mcp_tools
+
         return [
             self.adapter.adapt(partial(_sync_call_tool, session, tool.name), tool)
             for session, tools in zip(self.sessions, self.mcp_tools)
             for tool in tools
         ]
+
+    def start(self):
+        """Start the client in synchronous context."""
+        self.thread.start()
+
+        # check connection to mcp server is ready
+        if not self.ready.wait(timeout=self.connect_timeout):
+            raise TimeoutError(
+                f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
+            )
 
     def close(self):
         """Clean up resources and stop the client."""
@@ -245,29 +292,27 @@ class MCPAdapt:
         self.loop.close()  # we won't be using the loop anymore we can safely close it
 
     def __enter__(self):
-        self.thread.start()
-
-        # check connection to mcp server is ready
-        if not self.ready.wait(timeout=self.connect_timeout):
-            raise TimeoutError(
-                f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
-            )
-
+        self.start()
         return self.tools()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
     # -- add support for async context manager as well if the agent framework supports it.
-    def atools(self) -> list[Any]:
+    async def atools(self) -> list[Any]:
         """Returns the tools from the MCP server adapted to the desired Agent framework.
 
         This is what is yielded if used as an async context manager otherwise you can
         access it directly via this method.
 
-        An equivalent async method is available if your Agent framework supports it:
-        see :meth:`atools`.
+        Only use this when you start the client in asynchronous context.
+
+        An equivalent sync method is available if your Agent framework supports it:
+        see :meth:`tools`.
         """
+        # refresh tools
+        self.mcp_tools = [(await s.list_tools()).tools for s in self.sessions]
+
         return [
             self.adapter.async_adapt(partial(session.call_tool, tool.name), tool)
             for session, tools in zip(self.sessions, self.mcp_tools)
@@ -284,7 +329,7 @@ class MCPAdapt:
 
         self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
 
-        return self.atools()
+        return await self.atools()
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self._ctxmanager.__aexit__(exc_type, exc_val, exc_tb)

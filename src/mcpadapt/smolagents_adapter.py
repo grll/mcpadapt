@@ -9,6 +9,8 @@ Example Usage:
 """
 
 import logging
+import keyword
+import re
 from typing import Any, Callable, Coroutine
 
 import jsonref  # type: ignore
@@ -20,11 +22,37 @@ from mcpadapt.core import ToolAdapter
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_function_name(name):
+    """
+    A function to sanitize function names to be used as a tool name.
+    Prevent the use of dashes or other python keywords as function names by tool.
+    """
+    # Replace dashes with underscores
+    name = name.replace("-", "_")
+
+    # Remove any characters that aren't alphanumeric or underscore
+    name = re.sub(r"[^\w_]", "", name)
+
+    # Ensure it doesn't start with a number
+    if name[0].isdigit():
+        name = f"_{name}"
+
+    # Check if it's a Python keyword
+    if keyword.iskeyword(name):
+        name = f"{name}_"
+
+    return name
+
+
 class SmolAgentsAdapter(ToolAdapter):
     """Adapter for the `smolagents` framework.
 
     Note that the `smolagents` framework do not support async tools at this time so we
     write only the adapt method.
+
+    Warning: if the mcp tool name is a python keyword, starts with digits or contains
+    dashes, the tool name will be sanitized to become a valid python function name.
+
     """
 
     def adapt(
@@ -50,7 +78,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 inputs: dict[str, dict[str, str]],
                 output_type: str,
             ):
-                self.name = name
+                self.name = _sanitize_function_name(name)
                 self.description = description
                 self.inputs = inputs
                 self.output_type = output_type

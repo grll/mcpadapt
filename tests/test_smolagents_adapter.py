@@ -135,3 +135,55 @@ def test_optional_sync(echo_server_optional_script):
         assert tools[1]() == "Echo: empty"
         assert tools[2].name == "echo_tool_union_none"
         assert tools[2](text="hello") == "Echo: hello"
+
+
+def test_tool_name_with_dashes():
+    mcp_server_script = dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Echo Server")
+
+        @mcp.tool(name="echo-tool")
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            return f"Echo: {text}"
+        
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0].name == "echo_tool"
+        assert tools[0](text="hello") == "Echo: hello"
+
+
+def test_tool_name_with_keyword():
+    mcp_server_script = dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Echo Server")
+
+        @mcp.tool(name="def")
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            return f"Echo: {text}"
+        
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0].name == "def_"
+        assert tools[0](text="hello") == "Echo: hello"

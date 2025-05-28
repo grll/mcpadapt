@@ -15,3 +15,9 @@ notebooks/
 
 # mkdocs documentation
 /site
+
+# macOS files
+.DS_Store
+
+# Claude files
+**/.claude/settings.local.json
