@@ -84,7 +84,38 @@ def _generate_tool_class(
     # TODO: this could be better and handle nested objects...
     tool_params = []
     for k, v in properties.items():
-        tool_params.append(f"{k}: {JSON_SCHEMA_TO_PYTHON_TYPES[v['type']]}")
+        # Handle case where 'type' is missing but 'anyOf' is present (for multiple types)
+        if "type" in v:
+            if isinstance(v["type"], list):
+                # Handle list-type (multiple allowed types in JSON Schema)
+                types = []
+                for t in v["type"]:
+                    if t != "null":  # Exclude null types
+                        types.append(JSON_SCHEMA_TO_PYTHON_TYPES[t])
+
+                if len(types) > 1:
+                    python_type = " | ".join(types)
+                else:
+                    python_type = types[0] if types else "str"  # Default to str
+            else:
+                python_type = JSON_SCHEMA_TO_PYTHON_TYPES[v["type"]]
+        elif "anyOf" in v:
+            # Extract types from anyOf
+            types = []
+            for option in v["anyOf"]:
+                if "type" in option and option["type"] != "null":
+                    types.append(JSON_SCHEMA_TO_PYTHON_TYPES[option["type"]])
+
+            if len(types) > 1:
+                python_type = " | ".join(types)
+            else:
+                python_type = types[0] if types else "str"  # Default to str
+        else:
+            # Default to str if no type information is available
+            python_type = "str"
+
+        tool_params.append(f"{k}: {python_type}")
+
     tool_params = ", ".join(tool_params)
 
     argument = "{" + ", ".join(f"'{k}': {k}" for k in properties.keys()) + "}"
