@@ -176,6 +176,7 @@ class MCPAdapt:
         | list[StdioServerParameters | dict[str, Any]],
         adapter: ToolAdapter,
         connect_timeout: int = 30,
+        client_session_timeout_seconds: float | timedelta | None = 5,
     ):
         """
         Manage the MCP server / client lifecycle and expose tools adapted with the adapter.
@@ -185,6 +186,7 @@ class MCPAdapt:
                 MCP server parameters (stdio or sse). Can be a list if you want to connect multiple MCPs at once.
             adapter (ToolAdapter): Adapter to use to convert MCP tools call into agentic framework tools.
             connect_timeout (int): Connection timeout in seconds to the mcp server (default is 30s).
+            client_session_timeout_seconds: Timeout for MCP ClientSession calls
 
         Raises:
             TimeoutError: When the connection to the mcp server time out.
@@ -209,6 +211,7 @@ class MCPAdapt:
         self.thread = threading.Thread(target=self._run_loop, daemon=True)
 
         self.connect_timeout = connect_timeout
+        self.client_session_timeout_seconds = client_session_timeout_seconds
 
     def _run_loop(self):
         """Runs the event loop in a separate thread (for synchronous usage)."""
@@ -217,7 +220,7 @@ class MCPAdapt:
         async def setup():
             async with AsyncExitStack() as stack:
                 connections = [
-                    await stack.enter_async_context(mcptools(params))
+                    await stack.enter_async_context(mcptools(params, self.client_session_timeout_seconds))
                     for params in self.serverparams
                 ]
                 self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
@@ -323,7 +326,7 @@ class MCPAdapt:
         self._ctxmanager = AsyncExitStack()
 
         connections = [
-            await self._ctxmanager.enter_async_context(mcptools(params))
+            await self._ctxmanager.enter_async_context(mcptools(params, self.client_session_timeout_seconds))
             for params in self.serverparams
         ]
 
