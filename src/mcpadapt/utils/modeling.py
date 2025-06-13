@@ -145,7 +145,7 @@ def create_model_from_json_schema(
             default = field_schema.get("default")
             is_required = field_name in required and default is None
 
-            if is_nullable and not is_required:
+            if is_nullable or not is_required:
                 field_type = Optional[field_type]  # type: ignore
 
             return field_type, ... if is_required else default
