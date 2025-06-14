@@ -153,6 +153,28 @@ async def echo_streamable_http_server(echo_server_streamable_http_script):
         process.wait()
 
 
+@pytest.fixture
+def slow_start_server_script():
+    return dedent(
+        '''
+        import time
+        from mcp.server.fastmcp import FastMCP
+
+        # Sleep for 2 seconds to simulate slow startup
+        time.sleep(2)
+        
+        mcp = FastMCP("Slow Server")
+
+        @mcp.tool()
+        def echo_tool(text: str) -> str:
+            """Echo the input text"""
+            return f"Echo: {text}"
+        
+        mcp.run()
+        '''
+    )
+
+
 def test_basic_sync(echo_server_script):
     with MCPAdapt(
         StdioServerParameters(
@@ -319,3 +341,61 @@ async def test_basic_async_streamable_http(echo_streamable_http_server):
     ) as tools:
         assert len(tools) == 1
         assert (await tools[0]({"text": "hello"})).content[0].text == "Echo: hello"
+
+
+def test_connect_timeout(slow_start_server_script):
+    """Test that connect_timeout raises TimeoutError when server starts slowly"""
+    with pytest.raises(TimeoutError, match="Couldn't connect to the MCP server after 1 seconds"):
+        with MCPAdapt(
+            StdioServerParameters(
+                command="uv", args=["run", "python", "-c", slow_start_server_script]
+            ),
+            DummyAdapter(),
+            connect_timeout=1,  # 1 second timeout, server takes 2 seconds to start
+        ):
+            pass
+
+
+def test_client_session_timeout_parameter_propagation(echo_server_script):
+    """Test that client_session_timeout_seconds parameter is properly stored and accessible"""
+    from datetime import timedelta
+    
+    # Test with float value
+    adapter_float = MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", echo_server_script]
+        ),
+        DummyAdapter(),
+        client_session_timeout_seconds=2.5,
+    )
+    assert adapter_float.client_session_timeout_seconds == 2.5
+    
+    # Test with timedelta value
+    timeout_td = timedelta(seconds=3.0)
+    adapter_td = MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", echo_server_script]
+        ),
+        DummyAdapter(),
+        client_session_timeout_seconds=timeout_td,
+    )
+    assert adapter_td.client_session_timeout_seconds == timeout_td
+    
+    # Test with None value
+    adapter_none = MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", echo_server_script]
+        ),
+        DummyAdapter(),
+        client_session_timeout_seconds=None,
+    )
+    assert adapter_none.client_session_timeout_seconds is None
+    
+    # Test default value
+    adapter_default = MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", echo_server_script]
+        ),
+        DummyAdapter(),
+    )
+    assert adapter_default.client_session_timeout_seconds == 5
