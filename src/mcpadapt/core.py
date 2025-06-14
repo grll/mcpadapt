@@ -220,7 +220,9 @@ class MCPAdapt:
         async def setup():
             async with AsyncExitStack() as stack:
                 connections = [
-                    await stack.enter_async_context(mcptools(params, self.client_session_timeout_seconds))
+                    await stack.enter_async_context(
+                        mcptools(params, self.client_session_timeout_seconds)
+                    )
                     for params in self.serverparams
                 ]
                 self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
@@ -326,7 +328,9 @@ class MCPAdapt:
         self._ctxmanager = AsyncExitStack()
 
         connections = [
-            await self._ctxmanager.enter_async_context(mcptools(params, self.client_session_timeout_seconds))
+            await self._ctxmanager.enter_async_context(
+                mcptools(params, self.client_session_timeout_seconds)
+            )
             for params in self.serverparams
         ]
 
