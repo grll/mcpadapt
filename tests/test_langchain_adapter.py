@@ -136,6 +136,8 @@ def test_basic_sync_sse(echo_sse_server):
         LangChainAdapter(),
     ) as tools:
         assert len(tools) == 1
+        assert tools[0].name == "echo_tool"
+        assert tools[0].invoke("hello") == "Echo: hello"
 
 
 def test_json_schema_array_type_handling(json_schema_array_type_server_script):
