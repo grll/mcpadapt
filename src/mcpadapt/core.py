@@ -139,7 +139,7 @@ class MCPAdapt:
     If running asynchronously, it will use the async context manager and return async
     tools.
 
-    Dependening on what your Agent framework supports choose the approriate method. If
+    Depending on what your Agent framework supports choose the appropriate method. If
     async is supported it is recommended.
 
     Important Note: adapters need to implement the async_adapt method to support async
