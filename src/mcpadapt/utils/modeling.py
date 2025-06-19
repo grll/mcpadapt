@@ -12,15 +12,6 @@ json_type_mapping: dict[str, Type] = {
     "array": list,
 }
 
-json_type_mapping = {
-    "string": str,
-    "number": float,
-    "integer": int,
-    "boolean": bool,
-    "object": dict,
-    "array": list,
-}
-
 
 def resolve_refs_and_remove_defs(json_obj):
     # Extract $defs
