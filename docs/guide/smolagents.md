@@ -112,7 +112,7 @@ This approach achieves the same result but uses MCPAdapt directly with its smola
 
 ## Full Working Code Example
 
-You a fully working script of this example [here](https://github.com/grll/mcpadapt/blob/main/examples/smolagents_pubmed.py)
+You can find a fully working script of this example [here](https://github.com/grll/mcpadapt/blob/main/examples/smolagents_pubmed.py)
 
 
 
