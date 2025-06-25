@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Guillaume Raille", email = "guillaume.raille@gmail.com" }]
 dependencies = [
-    "mcp>=1.9.0",
+    "mcp>=1.9.4",
     "jsonref>=1.1.0",
     "python-dotenv>=1.0.1",
     "pydantic>=2.10.6",
@@ -54,6 +54,9 @@ crewai = [
 ]
 google-genai = [
     "google-genai>=1.2.0",
+]
+audio = [
+    "torchaudio>=2.7.1",
 ]
 
 [tool.hatch.version]

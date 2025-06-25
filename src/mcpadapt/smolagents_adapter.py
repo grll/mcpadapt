@@ -8,14 +8,17 @@ Example Usage:
 >>>     print(tools)
 """
 
-import logging
+import base64
 import keyword
+import logging
 import re
+from io import BytesIO
 from typing import Any, Callable, Coroutine
 
 import jsonref  # type: ignore
 import mcp
 import smolagents  # type: ignore
+from smolagents.utils import _is_package_available
 
 from mcpadapt.core import ToolAdapter
 
@@ -85,7 +88,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 self.is_initialized = True
                 self.skip_forward_signature_validation = True
 
-            def forward(self, *args, **kwargs) -> str:
+            def forward(self, *args, **kwargs):
                 if len(args) > 0:
                     if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
                         mcp_output = func(args[0])
@@ -104,12 +107,35 @@ class SmolAgentsAdapter(ToolAdapter):
                         f"tool {self.name} returned multiple content, using the first one"
                     )
 
-                if not isinstance(mcp_output.content[0], mcp.types.TextContent):
-                    raise ValueError(
-                        f"tool {self.name} returned a non-text content: `{type(mcp_output.content[0])}`"
-                    )
+                content = mcp_output.content[0]
 
-                return mcp_output.content[0].text  # type: ignore
+                if isinstance(content, mcp.types.TextContent):
+                    return content.text
+
+                if isinstance(content, mcp.types.ImageContent):
+                    from PIL import Image
+
+                    image_data = base64.b64decode(content.data)
+                    image = Image.open(BytesIO(image_data))
+                    return image
+
+                if isinstance(content, mcp.types.AudioContent):
+                    if not _is_package_available("torchaudio"):
+                        raise ValueError(
+                            "Audio content requires the torchaudio package to be installed. "
+                            "Please install it with `pip install torchaudio`.",
+                        )
+                    else:
+                        import torchaudio
+
+                        audio_data = base64.b64decode(content.data)
+                        audio_io = BytesIO(audio_data)
+                        audio_tensor, _ = torchaudio.load(audio_io)
+                        return audio_tensor
+
+                raise ValueError(
+                    f"tool {self.name} returned an unsupported content type: {type(content)}"
+                )
 
         # make sure jsonref are resolved
         input_schema = {
@@ -129,7 +155,7 @@ class SmolAgentsAdapter(ToolAdapter):
             name=mcp_tool.name,
             description=mcp_tool.description or "",
             inputs=input_schema["properties"],
-            output_type="string",
+            output_type="object",
         )
 
         return tool
