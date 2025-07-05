@@ -67,9 +67,8 @@ class CrewAIAdapter(ToolAdapter):
                 filtered_kwargs: dict[str, Any] = {}
                 schema_properties = mcp_tool.inputSchema.get("properties", {})
 
-                for key, value in kwargs.items():
-                    if value is None and key in schema_properties:
-                        prop_schema = schema_properties[key]
+                for key, prop_schema in schema_properties.items():
+                    if not key in kwargs:
                         # Check if the property allows null
                         # Simple check: if type is a list containing "null" or anyOf includes null
                         if isinstance(prop_schema.get("type"), list):
@@ -81,10 +80,10 @@ class CrewAIAdapter(ToolAdapter):
                                 opt.get("type") == "null"
                                 for opt in prop_schema["anyOf"]
                             ):
-                                filtered_kwargs[key] = value
+                                filtered_kwargs[key] = prop_schema.get("default", None)
                         # If neither case allows null, skip the None value
                     else:
-                        filtered_kwargs[key] = value
+                        filtered_kwargs[key] = kwargs[key]
 
                 return func(filtered_kwargs).content[0].text  # type: ignore
 
@@ -118,4 +117,4 @@ if __name__ == "__main__":
         CrewAIAdapter(),
     ) as tools:
         print(tools)
-        print(tools[0].run(text="hello"))
+        assert tools[0].run(text="hello") == "echo_tool(None,hello)"
