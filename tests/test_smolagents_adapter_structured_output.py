@@ -9,6 +9,7 @@ from mcpadapt.smolagents_adapter import SmolAgentsAdapter
 
 
 def test_weather_sync():
+    """Tests structured tool output. Expects a output schema and a dict from the tool call."""
     weather_server_script = dedent(
         """
         from mcp.server.fastmcp import FastMCP
