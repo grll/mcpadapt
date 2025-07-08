@@ -123,7 +123,7 @@ class SmolAgentsAdapter(ToolAdapter):
                     if not _is_package_available("torchaudio"):
                         raise ValueError(
                             "Audio content requires the torchaudio package to be installed. "
-                            "Please install it with `pip install torchaudio`.",
+                            "Please install it with `uv add mcpadapt[smolagents,audio]`.",
                         )
                     else:
                         import torchaudio
