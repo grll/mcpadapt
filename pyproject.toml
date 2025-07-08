@@ -47,7 +47,8 @@ test = [
     "mcpadapt[langchain]",
     "mcpadapt[smolagents]",
     "mcpadapt[crewai]",
-    "mcpadapt[google-genai]"
+    "mcpadapt[google-genai]",
+    "mcpadapt[audio]"
 ]
 crewai = [
     "crewai>=0.108.0",

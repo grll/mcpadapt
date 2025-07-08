@@ -2511,6 +2511,7 @@ test = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "smolagents" },
+    { name = "torchaudio" },
 ]
 
 [package.dev-dependencies]
@@ -2546,6 +2547,7 @@ requires-dist = [
     { name = "smolagents", marker = "extra == 'smolagents'", specifier = ">=1.2.2" },
     { name = "smolagents", marker = "extra == 'test'", specifier = ">=1.2.2" },
     { name = "torchaudio", marker = "extra == 'audio'", specifier = ">=2.7.1" },
+    { name = "torchaudio", marker = "extra == 'test'", specifier = ">=2.7.1" },
 ]
 provides-extras = ["audio", "crewai", "google-genai", "langchain", "llamaindex", "smolagents", "test"]
 
