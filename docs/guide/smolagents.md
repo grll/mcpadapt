@@ -110,6 +110,10 @@ with MCPAdapt(
 
 This approach achieves the same result but uses MCPAdapt directly with its smolagents adapter.
 
+> [!NOTE]
+> The Audio Content is optional. If you want to use the audio content, you need to install the extra `audio` package:
+> `uv add mcpadapt[smolagents,audio]`
+
 ## Full Working Code Example
 
 You can find a fully working script of this example [here](https://github.com/grll/mcpadapt/blob/main/examples/smolagents_pubmed.py)
