@@ -237,3 +237,61 @@ def test_image_tool():
         image_content = tools[0]()
         assert isinstance(image_content, ImageFile)
         assert image_content.size == (100, 100)
+
+def test_audio_tool():
+    mcp_server_script = dedent(
+        '''
+        import os
+        import torch
+        import tempfile
+        import torchaudio
+        import base64
+        from mcp.server.fastmcp import FastMCP
+        from mcp.types import AudioContent
+
+        mcp = FastMCP("Audio Server")
+
+        @mcp.tool("test_audio")
+        def test_audio() -> AudioContent:
+        
+            duration: float = 2.0
+            sample_rate: int = 16000
+            amplitude: float = 0.3
+        
+            # Generate random noise
+            num_samples = int(duration * sample_rate)
+            audio = amplitude * torch.randn(1, num_samples)
+        
+            # Convert to WAV bytes
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
+                tmp_path = tmp_file.name
+        
+            try:
+                # Save audio to temporary file
+                torchaudio.save(tmp_path, audio, sample_rate)
+        
+                # Read the file back as bytes
+                with open(tmp_path, "rb") as f:
+                    wav_bytes = f.read()
+        
+            finally:
+                # Clean up temporary file
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+        
+            return AudioContent(type="audio", data=base64.b64encode(wav_bytes).decode(), mimeType="audio/wav")
+
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        from torch import Tensor
+        assert len(tools) == 1
+        assert tools[0].name == "test_audio"
+        audio_content = tools[0]()
+        assert isinstance(audio_content, Tensor)
