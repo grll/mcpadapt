@@ -187,3 +187,53 @@ def test_tool_name_with_keyword():
         assert len(tools) == 1
         assert tools[0].name == "def_"
         assert tools[0](text="hello") == "Echo: hello"
+
+def test_image_tool():
+    mcp_server_script = dedent(
+        '''
+        import io
+        import random
+        from mcp.server.fastmcp import FastMCP, Image as FastMCPImage
+        from PIL import Image, ImageDraw
+
+        mcp = FastMCP("Image Server")
+
+        @mcp.tool("test_image")
+        def test_image() -> FastMCPImage:
+            width = 100
+            height = 100
+        
+            random.seed(42)
+            image = Image.new("RGB", (width, height))
+            draw = ImageDraw.Draw(image)
+        
+            for x in range(0, width, 2):
+                for y in range(0, height, 2):
+                    color = (
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                        random.randint(0, 255),
+                    )
+                    draw.rectangle([x, y, x + 1, y + 1], fill=color)
+        
+            buffer = io.BytesIO()
+            image.save(buffer, format='PNG')
+            buffer.seek(0)
+            return FastMCPImage(data=buffer.read(), format='png')
+
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        from PIL.ImageFile import ImageFile
+
+        assert len(tools) == 1
+        assert tools[0].name == "test_image"
+        image_content = tools[0]()
+        assert isinstance(image_content, ImageFile)
+        assert image_content.size == (100, 100)
