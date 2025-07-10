@@ -4,7 +4,7 @@ SmolAgents do not support async tools, so this adapter will only work with the s
 context manager.
 
 Example Usage:
->>> with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentAdapter()) as tools:
+>>> with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentsAdapter()) as tools:
 >>>     print(tools)
 """
 
