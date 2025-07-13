@@ -217,6 +217,7 @@ def test_image_tool(shared_datadir):
         assert tools[0].name == "test_image"
         image_content = tools[0]()
         assert isinstance(image_content, ImageFile)
+        assert image_content.size == (256, 256)
 
 
 def test_audio_tool(shared_datadir):
