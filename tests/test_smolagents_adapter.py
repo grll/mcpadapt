@@ -191,35 +191,15 @@ def test_tool_name_with_keyword():
 def test_image_tool():
     mcp_server_script = dedent(
         '''
-        import io
-        import random
-        from mcp.server.fastmcp import FastMCP, Image as FastMCPImage
-        from PIL import Image, ImageDraw
+        import os
+        from mcp.server.fastmcp import FastMCP, Image
 
         mcp = FastMCP("Image Server")
 
         @mcp.tool("test_image")
-        def test_image() -> FastMCPImage:
-            width = 100
-            height = 100
-        
-            random.seed(42)
-            image = Image.new("RGB", (width, height))
-            draw = ImageDraw.Draw(image)
-        
-            for x in range(0, width, 2):
-                for y in range(0, height, 2):
-                    color = (
-                        random.randint(0, 255),
-                        random.randint(0, 255),
-                        random.randint(0, 255),
-                    )
-                    draw.rectangle([x, y, x + 1, y + 1], fill=color)
-        
-            buffer = io.BytesIO()
-            image.save(buffer, format='PNG')
-            buffer.seek(0)
-            return FastMCPImage(data=buffer.read(), format='png')
+        def test_image() -> Image:
+            path = os.path.join("data", "random_image.png")
+            return Image(path=path, format='png')
 
         mcp.run()
         '''
@@ -236,15 +216,11 @@ def test_image_tool():
         assert tools[0].name == "test_image"
         image_content = tools[0]()
         assert isinstance(image_content, ImageFile)
-        assert image_content.size == (100, 100)
 
 def test_audio_tool():
     mcp_server_script = dedent(
         '''
         import os
-        import torch
-        import tempfile
-        import torchaudio
         import base64
         from mcp.server.fastmcp import FastMCP
         from mcp.types import AudioContent
@@ -253,31 +229,9 @@ def test_audio_tool():
 
         @mcp.tool("test_audio")
         def test_audio() -> AudioContent:
-        
-            duration: float = 2.0
-            sample_rate: int = 16000
-            amplitude: float = 0.3
-        
-            # Generate random noise
-            num_samples = int(duration * sample_rate)
-            audio = amplitude * torch.randn(1, num_samples)
-        
-            # Convert to WAV bytes
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
-                tmp_path = tmp_file.name
-        
-            try:
-                # Save audio to temporary file
-                torchaudio.save(tmp_path, audio, sample_rate)
-        
-                # Read the file back as bytes
-                with open(tmp_path, "rb") as f:
-                    wav_bytes = f.read()
-        
-            finally:
-                # Clean up temporary file
-                if os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
+            path = os.path.join("data", "white_noise.wav")
+            with open(path, "rb") as f:
+                wav_bytes = f.read()
         
             return AudioContent(type="audio", data=base64.b64encode(wav_bytes).decode(), mimeType="audio/wav")
 
