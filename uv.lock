@@ -2510,6 +2510,7 @@ test = [
     { name = "langgraph" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
+    { name = "pytest-datadir" },
     { name = "smolagents" },
     { name = "torchaudio" },
 ]
@@ -2543,6 +2544,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10.6" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.4" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.25.2" },
+    { name = "pytest-datadir", marker = "extra == 'test'", specifier = ">=1.7.2" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
     { name = "smolagents", marker = "extra == 'smolagents'", specifier = ">=1.2.2" },
     { name = "smolagents", marker = "extra == 'test'", specifier = ">=1.2.2" },
@@ -4359,6 +4361,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d0/d4/14f53324cb1a6381bef29d698987625d80052bb33932d8e7cbf9b337b17c/pytest_asyncio-1.0.0.tar.gz", hash = "sha256:d15463d13f4456e1ead2594520216b225a16f781e144f8fdf6c5bb4667c48b3f", size = 46960, upload-time = "2025-05-26T04:54:40.484Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/30/05/ce271016e351fddc8399e546f6e23761967ee09c8c568bbfbecb0c150171/pytest_asyncio-1.0.0-py3-none-any.whl", hash = "sha256:4f024da9f1ef945e680dc68610b52550e36590a67fd31bb3b4943979a1f90ef3", size = 15976, upload-time = "2025-05-26T04:54:39.035Z" },
+]
+
+[[package]]
+name = "pytest-datadir"
+version = "1.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2f/16/7701db071caf7d8f7226b76323de40a09d2a391c7d064cda072d45a87c7b/pytest_datadir-1.7.2.tar.gz", hash = "sha256:15f5228a35d0a3205e4968e75d3b9cca91762424e1eafc21eb637d380a48443e", size = 11265, upload-time = "2025-06-06T11:24:18.075Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/61/a06f3406852534e186413c75f544c90251db00fd8eb9625ee3ac239499f3/pytest_datadir-1.7.2-py3-none-any.whl", hash = "sha256:8392ba0e9eaf37030e663dcd91cc5123dec99c44300f0c5eac44f35f13f0e086", size = 6273, upload-time = "2025-06-06T11:24:16.388Z" },
 ]
 
 [[package]]

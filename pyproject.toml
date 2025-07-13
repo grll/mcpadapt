@@ -44,11 +44,12 @@ llamaindex = [
 test = [
     "pytest-asyncio>=0.25.2",
     "pytest>=8.3.4",
+    "pytest-datadir>=1.7.2",
     "mcpadapt[langchain]",
     "mcpadapt[smolagents]",
     "mcpadapt[crewai]",
     "mcpadapt[google-genai]",
-    "mcpadapt[audio]"
+    "mcpadapt[audio]",
 ]
 crewai = [
     "crewai>=0.108.0",
