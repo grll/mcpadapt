@@ -88,7 +88,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 self.is_initialized = True
                 self.skip_forward_signature_validation = True
 
-            def forward(self, *args, **kwargs):
+            def forward(self, *args, **kwargs) -> Any:
                 if len(args) > 0:
                     if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
                         mcp_output = func(args[0])
