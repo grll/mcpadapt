@@ -251,7 +251,7 @@ def test_audio_tool(shared_datadir):
         ),
         SmolAgentsAdapter(),
     ) as tools:
-        from torch import Tensor
+        from torch import Tensor # type: ignore
 
         assert len(tools) == 1
         assert tools[0].name == "test_audio"
