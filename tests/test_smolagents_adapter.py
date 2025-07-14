@@ -189,9 +189,11 @@ def test_tool_name_with_keyword():
         assert tools[0].name == "def_"
         assert tools[0](text="hello") == "Echo: hello"
 
+
 @pytest.fixture
 def shared_datadir():
     return Path(__file__).parent / "data"
+
 
 def test_image_tool(shared_datadir):
     mcp_server_script = dedent(
@@ -251,7 +253,7 @@ def test_audio_tool(shared_datadir):
         ),
         SmolAgentsAdapter(),
     ) as tools:
-        from torch import Tensor # type: ignore
+        from torch import Tensor  # type: ignore
 
         assert len(tools) == 1
         assert tools[0].name == "test_audio"
