@@ -13,16 +13,20 @@ import keyword
 import logging
 import re
 from io import BytesIO
-from typing import Any, Callable, Coroutine
+from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
 import jsonref  # type: ignore
 import mcp
 import smolagents  # type: ignore
-from smolagents.utils import _is_package_available
+from smolagents.utils import _is_package_available  # type: ignore
 
 from mcpadapt.core import ToolAdapter
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    import torch
+    from PIL.Image import Image as PILImage
 
 
 def _sanitize_function_name(name):
@@ -88,7 +92,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 self.is_initialized = True
                 self.skip_forward_signature_validation = True
 
-            def forward(self, *args, **kwargs) -> Any:
+            def forward(self, *args, **kwargs) -> str | "PILImage" | "torch.Tensor":
                 if len(args) > 0:
                     if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
                         mcp_output = func(args[0])
@@ -126,7 +130,7 @@ class SmolAgentsAdapter(ToolAdapter):
                             "Please install it with `uv add mcpadapt[smolagents,audio]`.",
                         )
                     else:
-                        import torchaudio
+                        import torchaudio  # type: ignore
 
                         audio_data = base64.b64decode(content.data)
                         audio_io = BytesIO(audio_data)
