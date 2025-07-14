@@ -13,7 +13,7 @@ import keyword
 import logging
 import re
 from io import BytesIO
-from typing import TYPE_CHECKING, Any, Callable, Coroutine
+from typing import TYPE_CHECKING, Any, Callable, Coroutine, Union
 
 import jsonref  # type: ignore
 import mcp
@@ -92,7 +92,9 @@ class SmolAgentsAdapter(ToolAdapter):
                 self.is_initialized = True
                 self.skip_forward_signature_validation = True
 
-            def forward(self, *args, **kwargs) -> str | "PILImage" | "torch.Tensor":
+            def forward(
+                self, *args, **kwargs
+            ) -> Union[str, "PILImage", "torch.Tensor"]:
                 if len(args) > 0:
                     if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
                         mcp_output = func(args[0])
