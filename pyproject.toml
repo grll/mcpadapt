@@ -59,6 +59,7 @@ google-genai = [
 ]
 audio = [
     "torchaudio>=2.7.1",
+    "soundfile>=0.13.1",
 ]
 
 [tool.hatch.version]
