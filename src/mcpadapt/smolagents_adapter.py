@@ -58,6 +58,7 @@ This avoids making assumptions about which specific JSON Schema types MCP offici
 supports, focusing on the fundamental distinction between structured vs. unstructured output.
 """
 
+import base64
 import json
 import keyword
 import logging
@@ -226,7 +227,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 self.is_initialized = True
                 self.skip_forward_signature_validation = True
 
-            def forward(self, *args, **kwargs) -> Any:
+            def forward(self, *args, **kwargs) -> Union[str, "PILImage", "torch.Tensor", Any]:
                 if len(args) > 0:
                     if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
                         mcp_output = func(args[0])
@@ -260,28 +261,52 @@ class SmolAgentsAdapter(ToolAdapter):
 
                 # Get the first content item
                 content_item = mcp_output.content[0]
-                if not isinstance(content_item, mcp.types.TextContent):
+
+                # Handle different content types
+                if isinstance(content_item, mcp.types.TextContent):
+                    text_content = content_item.text
+
+                    # Apply structured processing if enabled and expecting structured output
+                    if self.use_structured_features and self.output_type == "object" and text_content:
+                        try:
+                            parsed_data = json.loads(text_content)
+                            return _validate_output_against_schema(
+                                parsed_data, self.output_schema, self.name, strict=False
+                            )
+                        except json.JSONDecodeError:
+                            logger.warning(
+                                f"tool {self.name} expected structured output but got unparseable text: {text_content[:100]}..."
+                            )
+                            # Fall through to return text as-is for backwards compatibility
+
+                    # Return simple text content (works for both modes)
+                    return text_content
+
+                elif isinstance(content_item, mcp.types.ImageContent):
+                    from PIL import Image
+
+                    image_data = base64.b64decode(content_item.data)
+                    image = Image.open(BytesIO(image_data))
+                    return image
+
+                elif isinstance(content_item, mcp.types.AudioContent):
+                    if not _is_package_available("torchaudio"):
+                        raise ValueError(
+                            "Audio content requires the torchaudio package to be installed. "
+                            "Please install it with `uv add mcpadapt[smolagents,audio]`.",
+                        )
+                    else:
+                        import torchaudio  # type: ignore
+
+                        audio_data = base64.b64decode(content_item.data)
+                        audio_io = BytesIO(audio_data)
+                        audio_tensor, _ = torchaudio.load(audio_io)
+                        return audio_tensor
+
+                else:
                     raise ValueError(
-                        f"tool {self.name} returned a non-text content: `{type(content_item)}`"
+                        f"tool {self.name} returned an unsupported content type: {type(content_item)}"
                     )
-
-                text_content = content_item.text  # type: ignore
-
-                # Apply structured processing if enabled and expecting structured output
-                if self.use_structured_features and self.output_type == "object" and text_content:
-                    try:
-                        parsed_data = json.loads(text_content)
-                        return _validate_output_against_schema(
-                            parsed_data, self.output_schema, self.name, strict=False
-                        )
-                    except json.JSONDecodeError:
-                        logger.warning(
-                            f"tool {self.name} expected structured output but got unparseable text: {text_content[:100]}..."
-                        )
-                        # Fall through to return text as-is for backwards compatibility
-
-                # Return simple text content (works for both modes)
-                return text_content
 
         tool = MCPAdaptTool(
             name=mcp_tool.name,
