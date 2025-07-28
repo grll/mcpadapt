@@ -198,3 +198,121 @@ def test_simple_text_tool():
         result = tool()
         assert result == "hello world"
 
+
+def test_backwards_compatibility():
+    """Tests that the same tools work consistently with structured_output=False and True.
+
+    This ensures existing code doesn't break when upgrading and that tools
+    behave predictably regardless of the structured_output setting.
+    """
+    server_script = dedent(
+        """
+        from mcp.server.fastmcp import FastMCP
+        from typing import Any
+
+        mcp = FastMCP("Compatibility Server")
+
+        @mcp.tool()
+        def simple_text_tool(message: str) -> str:
+            '''Returns a simple text message'''
+            return f"Echo: {message}"
+
+        @mcp.tool()
+        def structured_data_tool(location: str) -> dict[str, Any]:
+            '''Returns structured weather data'''
+            return {
+                "location": location,
+                "weather": "sunny",
+                "temperature": 22,
+                "humidity": 65
+            }
+
+        mcp.run()
+        """
+    )
+
+    # Test with legacy behavior (structured_output=False)
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", server_script]
+        ),
+        SmolAgentsAdapter(structured_output=False),
+    ) as legacy_tools:
+        # We know the tools are created in order, so we can use simple indexing
+        simple_tool_legacy = legacy_tools[0]  # simple_text_tool
+        structured_tool_legacy = legacy_tools[1]  # structured_data_tool
+
+        # Verify we got the right tools
+        assert simple_tool_legacy.name == "simple_text_tool"
+        assert structured_tool_legacy.name == "structured_data_tool"
+
+        # Both tools should have string output_type in legacy mode
+        assert simple_tool_legacy.output_type == "string"
+        assert structured_tool_legacy.output_type == "string"
+        assert simple_tool_legacy.output_schema is None
+        assert structured_tool_legacy.output_schema is None
+        assert simple_tool_legacy.use_structured_features is False
+        assert structured_tool_legacy.use_structured_features is False
+
+        # Call the tools in legacy mode
+        simple_result_legacy = simple_tool_legacy(message="test")
+        structured_result_legacy = structured_tool_legacy(location="London")
+
+        assert simple_result_legacy == "Echo: test"
+        # structured_tool result should be JSON string in legacy mode
+        assert isinstance(structured_result_legacy, str)
+        assert "London" in structured_result_legacy
+        assert "sunny" in structured_result_legacy
+
+    # Test with enhanced behavior (structured_output=True)
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", server_script]
+        ),
+        SmolAgentsAdapter(structured_output=True),
+    ) as enhanced_tools:
+        # Same tools, same order - much clearer than complex searching
+        simple_tool_enhanced = enhanced_tools[0]  # simple_text_tool
+        structured_tool_enhanced = enhanced_tools[1]  # structured_data_tool
+
+        # Verify we got the right tools
+        assert simple_tool_enhanced.name == "simple_text_tool"
+        assert structured_tool_enhanced.name == "structured_data_tool"
+
+        # Both tools get enhanced features and schemas
+        assert simple_tool_enhanced.output_type == "object"  # FastMCP auto-generates schema even for str
+        assert simple_tool_enhanced.output_schema is not None  # Schema exists for str return type
+        assert simple_tool_enhanced.use_structured_features is True
+
+        assert structured_tool_enhanced.output_type == "object"
+        assert structured_tool_enhanced.output_schema is not None
+        assert structured_tool_enhanced.use_structured_features is True
+
+        # Call the tools in enhanced mode
+        simple_result_enhanced = simple_tool_enhanced(message="test")
+        structured_result_enhanced = structured_tool_enhanced(location="London")
+
+        # Key behavior differences discovered by this test:
+
+        # Simple text tools - enhanced mode wraps results
+        assert isinstance(simple_result_enhanced, dict)
+        assert simple_result_enhanced["result"] == "Echo: test"  # Wrapped in result object
+        # vs legacy mode returns plain string: "Echo: test"
+
+        # Structured tools show the format difference:
+        assert isinstance(structured_result_enhanced, dict)  # Dict in enhanced mode
+        assert structured_result_enhanced["location"] == "London"
+        assert structured_result_enhanced["weather"] == "sunny"
+
+        # Legacy mode returns JSON string, enhanced mode returns dict
+        # But both contain the same underlying data
+        import json
+        parsed_legacy_result = json.loads(structured_result_legacy)
+        assert parsed_legacy_result == structured_result_enhanced  # Same data, different format
+
+        # Backwards compatibility verified:
+        # - Legacy mode: Returns raw data (strings as strings, dicts as JSON strings)
+        # - Enhanced mode: Returns structured objects (strings wrapped, dicts native)
+        # - Both contain the same information, just in different formats
+        # - Existing code will keep working, new code gets enhanced features
+
