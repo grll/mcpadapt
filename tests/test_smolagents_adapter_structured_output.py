@@ -190,8 +190,8 @@ def test_simple_text_tool():
         tool = tools[0]
         assert tool.name == "hello_world"
 
-        # Verify that a simple string output results in "string" type and no schema
-        assert tool.output_type == "string"
+        # Verify that a simple object output results in "object" type and no schema
+        assert tool.output_type == "object"
         assert tool.output_schema is None
 
         # Call the tool and check the output
@@ -246,9 +246,9 @@ def test_backwards_compatibility():
         assert simple_tool_legacy.name == "simple_text_tool"
         assert structured_tool_legacy.name == "structured_data_tool"
 
-        # Both tools should have string output_type in legacy mode
-        assert simple_tool_legacy.output_type == "string"
-        assert structured_tool_legacy.output_type == "string"
+        # Both tools should have object output_type in legacy mode
+        assert simple_tool_legacy.output_type == "object"
+        assert structured_tool_legacy.output_type == "object"
         assert simple_tool_legacy.output_schema is None
         assert structured_tool_legacy.output_schema is None
         assert simple_tool_legacy.use_structured_features is False
@@ -280,8 +280,8 @@ def test_backwards_compatibility():
         assert structured_tool_enhanced.name == "structured_data_tool"
 
         # Both tools get enhanced features and schemas
-        assert simple_tool_enhanced.output_type == "object"  # FastMCP auto-generates schema even for str
-        assert simple_tool_enhanced.output_schema is not None  # Schema exists for str return type
+        assert simple_tool_enhanced.output_type == "object"  # FastMCP auto-generates schema even for object
+        assert simple_tool_enhanced.output_schema is not None  # Schema exists for object return type
         assert simple_tool_enhanced.use_structured_features is True
 
         assert structured_tool_enhanced.output_type == "object"

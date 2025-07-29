@@ -6,9 +6,8 @@ context manager.
 Features:
 - Converts MCP tools to SmolAgents tools
 - Supports outputSchema for structured output (MCP spec 2025-06-18+)
-- Simple output type detection: structured (object) vs plain text (string)
-- Handles both structured data and text content
-- Validates output against schema (with warnings, non-strict)
+- Always uses "object" output_type for maximum flexibility
+- Handles text, image, and audio content types
 - Backwards compatible with tools without outputSchema
 
 Example Usage:
@@ -38,24 +37,22 @@ The adapter uses a two-level parameter system for clean separation of concerns:
 Flow: User Intent → Adapter Config → Schema Processing → Tool Creation → Tool Behavior
       structured_output=True → self.structured_output → outputSchema extraction → use_structured_features=True → Enhanced processing
 
-Output Schema Support:
-The adapter supports MCP outputSchema with a simplified approach:
-- If outputSchema is provided → output_type = "object" (structured data expected)
-- If no outputSchema → output_type = "string" (plain text expected)
+Output Type Strategy:
+The adapter always uses output_type="object" for maximum flexibility, allowing smolagents
+to handle type detection at runtime. This supports all MCP content types:
+- TextContent (strings) → handled by smolagents runtime type detection
+- ImageContent (PIL Images) → handled by smolagents runtime type detection
+- AudioContent (torch Tensors) → handled by smolagents runtime type detection
 
 When an MCP tool provides an outputSchema, the adapter will:
 1. Use structuredContent if available from the MCP tool response
 2. Parse JSON from text content if structured data is expected but not provided
-3. Validate output against the schema (warnings only, not strict)
-4. Fall back to returning text as-is for backwards compatibility
+3. Fall back to returning text as-is for backwards compatibility
 
 Backwards Compatibility:
-- structured_output=False (default): Uses original simple text-only behavior
+- structured_output=False (default): Uses original simple behavior
 - structured_output=True: Enables enhanced features while maintaining fallback compatibility
 - No breaking changes to existing code
-
-This avoids making assumptions about which specific JSON Schema types MCP officially
-supports, focusing on the fundamental distinction between structured vs. unstructured output.
 """
 
 import base64
@@ -100,46 +97,6 @@ def _sanitize_function_name(name):
         name = f"{name}_"
 
     return name
-
-
-def _validate_output_against_schema(
-    output: Any,
-    schema: dict[str, Any] | None,
-    tool_name: str,
-    strict: bool = False
-) -> Any:
-    """
-    Optionally validate output against schema.
-
-    Since we simplified to only "object" vs "string" output types, this just does
-    basic validation that structured output was provided when a schema exists.
-
-    Args:
-        output: The output to validate
-        schema: The JSON schema to validate against
-        tool_name: Tool name for error messages
-        strict: If True, raise exception on validation failure; if False, just log warning
-
-    Returns:
-        The original output (unchanged)
-
-    Raises:
-        ValueError: If strict=True and validation fails
-    """
-    if not schema:
-        return output
-
-    # Basic check: if there's a schema, we expect some kind of structured data
-    # (not just a plain string, unless the schema specifically expects a string)
-    schema_type = schema.get("type")
-    if schema_type != "string" and isinstance(output, str):
-        error_msg = f"tool {tool_name} has outputSchema but returned plain text instead of structured data"
-        if strict:
-            raise ValueError(error_msg)
-        else:
-            logger.warning(error_msg)
-
-    return output
 
 
 class SmolAgentsAdapter(ToolAdapter):
@@ -202,11 +159,9 @@ class SmolAgentsAdapter(ToolAdapter):
                 logger.warning(f"Failed to resolve outputSchema for tool {mcp_tool.name}: {e}")
                 output_schema = mcp_tool.outputSchema  # Use unresolved schema as fallback
 
-        # Determine output_type based on mode and schema
-        if self.structured_output and output_schema:
-            output_type = "object"  # Structured data expected
-        else:
-            output_type = "string"  # Plain text expected
+        # Always use "object" output_type for maximum flexibility
+        # Smolagents will handle type detection at runtime
+        output_type = "object"
 
         class MCPAdaptTool(smolagents.Tool):
             def __init__(
@@ -246,9 +201,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 if self.use_structured_features:
                     # Prioritize structuredContent if available
                     if hasattr(mcp_output, 'structuredContent') and mcp_output.structuredContent is not None:
-                        return _validate_output_against_schema(
-                            mcp_output.structuredContent, self.output_schema, self.name, strict=False
-                        )
+                        return mcp_output.structuredContent
 
                 # Handle multiple content warning (unified for both modes)
                 if len(mcp_output.content) > 1:
@@ -267,12 +220,10 @@ class SmolAgentsAdapter(ToolAdapter):
                     text_content = content_item.text
 
                     # Apply structured processing if enabled and expecting structured output
-                    if self.use_structured_features and self.output_type == "object" and text_content:
+                    if self.use_structured_features and text_content:
                         try:
                             parsed_data = json.loads(text_content)
-                            return _validate_output_against_schema(
-                                parsed_data, self.output_schema, self.name, strict=False
-                            )
+                            return parsed_data
                         except json.JSONDecodeError:
                             logger.warning(
                                 f"tool {self.name} expected structured output but got unparseable text: {text_content[:100]}..."
