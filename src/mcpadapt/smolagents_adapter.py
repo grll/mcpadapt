@@ -44,9 +44,9 @@ to handle type detection at runtime. This supports all MCP content types:
 - ImageContent (PIL Images) → handled by smolagents runtime type detection
 - AudioContent (torch Tensors) → handled by smolagents runtime type detection
 
-When an MCP tool provides an outputSchema, the adapter will:
+If structured_output=True, the adapter will:
 1. Use structuredContent if available from the MCP tool response
-2. Parse JSON from text content if structured data is expected but not provided
+2. Always attempt to parse JSON from text content if structuredContent is absent
 3. Fall back to returning text as-is for backwards compatibility
 
 Backwards Compatibility:
@@ -150,7 +150,7 @@ class SmolAgentsAdapter(ToolAdapter):
             if "type" not in v:
                 input_schema["properties"][k]["type"] = "string"
 
-        # Extract and resolve outputSchema if present (only when structured_output=True)
+        # Extract and resolve outputSchema if present (only if structured_output=True)
         output_schema = None
         if self.structured_output and hasattr(mcp_tool, 'outputSchema') and mcp_tool.outputSchema:
             try:
@@ -219,7 +219,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 if isinstance(content_item, mcp.types.TextContent):
                     text_content = content_item.text
 
-                    # Apply structured processing if enabled and expecting structured output
+                    # Always try to parse JSON if structured features are enabled and structuredContent is absent
                     if self.use_structured_features and text_content:
                         try:
                             parsed_data = json.loads(text_content)
