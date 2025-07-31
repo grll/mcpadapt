@@ -1,7 +1,6 @@
 from textwrap import dedent
 import logging
 
-import pytest
 from mcp import StdioServerParameters
 
 from mcpadapt.core import MCPAdapt
