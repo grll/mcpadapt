@@ -5,6 +5,7 @@ basic interfaces and classes for adapting tools from MCP to the desired Agent fr
 """
 
 import asyncio
+import copy
 import threading
 from abc import ABC, abstractmethod
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -96,11 +97,13 @@ async def mcptools(
     if isinstance(serverparams, StdioServerParameters):
         client = stdio_client(serverparams)
     elif isinstance(serverparams, dict):
-        transport = serverparams.pop("transport", "sse")
+        # Create a deep copy to avoid modifying the original dict
+        client_params = copy.deepcopy(serverparams)
+        transport = client_params.pop("transport", "sse")
         if transport == "sse":
-            client = sse_client(**serverparams)
+            client = sse_client(**client_params)
         elif transport == "streamable-http":
-            client = streamablehttp_client(**serverparams)
+            client = streamablehttp_client(**client_params)
         else:
             raise ValueError(
                 f"Invalid transport, expected sse or streamable-http found `{transport}`"
