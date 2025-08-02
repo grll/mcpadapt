@@ -2542,7 +2542,7 @@ requires-dist = [
     { name = "langgraph", marker = "extra == 'langchain'", specifier = ">=0.2.62" },
     { name = "langgraph", marker = "extra == 'test'", specifier = ">=0.2.62" },
     { name = "llama-index", marker = "extra == 'llamaindex'", specifier = ">=0.12.14" },
-    { name = "mcp", specifier = ">=1.9.4" },
+    { name = "mcp", specifier = ">=1.10.1" },
     { name = "pydantic", specifier = ">=2.10.6" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.3.4" },
     { name = "pytest-asyncio", marker = "extra == 'test'", specifier = ">=0.25.2" },
