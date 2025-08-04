@@ -1,5 +1,6 @@
 from pathlib import Path
 from textwrap import dedent
+import logging
 
 import pytest
 from mcp import StdioServerParameters
@@ -20,7 +21,7 @@ def echo_server_script():
         def echo_tool(text: str) -> str:
             """Echo the input text"""
             return f"Echo: {text}"
-        
+
         mcp.run()
         '''
     )
@@ -70,7 +71,7 @@ def echo_server_optional_script():
             if text is None:
                 return "No input provided"
             return f"Echo: {text}"
-        
+
         mcp.run()
         '''
     )
@@ -149,7 +150,7 @@ def test_tool_name_with_dashes():
         def echo_tool(text: str) -> str:
             """Echo the input text"""
             return f"Echo: {text}"
-        
+
         mcp.run()
         '''
     )
@@ -175,7 +176,7 @@ def test_tool_name_with_keyword():
         def echo_tool(text: str) -> str:
             """Echo the input text"""
             return f"Echo: {text}"
-        
+
         mcp.run()
         '''
     )
@@ -241,7 +242,7 @@ def test_audio_tool(shared_datadir):
             path = os.path.join("{shared_datadir}", "white_noise.wav")
             with open(path, "rb") as f:
                 wav_bytes = f.read()
-        
+
             return AudioContent(type="audio", data=base64.b64encode(wav_bytes).decode(), mimeType="audio/wav")
 
         mcp.run()
@@ -259,3 +260,101 @@ def test_audio_tool(shared_datadir):
         assert tools[0].name == "test_audio"
         audio_content = tools[0]()
         assert isinstance(audio_content, Tensor)
+
+def test_structured_output_types():
+    """Test that structured output returns correct types for different return annotations."""
+    server_script = dedent(
+        """
+        from mcp.server.fastmcp import FastMCP
+        from typing import Any
+
+        mcp = FastMCP("Types Server")
+
+        @mcp.tool()
+        def dict_tool() -> dict[str, Any]:
+            '''Returns a dictionary'''
+            return {"weather": "sunny", "temperature": 70}
+
+        @mcp.tool()
+        def list_tool() -> list[str]:
+            '''Returns a list'''
+            return ["London", "Paris", "Tokyo"]
+
+        @mcp.tool()
+        def string_tool() -> str:
+            '''Returns a string'''
+            return "Hello world"
+
+        mcp.run()
+        """
+    )
+
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", server_script]
+        ),
+        SmolAgentsAdapter(structured_output=True),
+    ) as tools:
+        dict_tool, list_tool, string_tool = tools
+
+        # Dict tool: should return dict directly with schema
+        assert dict_tool.output_type == "object"
+        assert dict_tool.output_schema is not None
+        dict_result = dict_tool()
+        assert isinstance(dict_result, dict)
+        assert dict_result["weather"] == "sunny"
+        assert dict_result["temperature"] == 70
+
+        # List tool: should be wrapped in {"result": list} with schema
+        assert list_tool.output_type == "object"
+        assert list_tool.output_schema is not None
+        list_result = list_tool()
+        assert isinstance(list_result, dict)
+        assert "result" in list_result
+        assert set(list_result["result"]) == {"London", "Paris", "Tokyo"}
+
+        # String tool: should be wrapped in {"result": string} with schema
+        assert string_tool.output_type == "object"
+        assert string_tool.output_schema is not None
+        string_result = string_tool()
+        assert isinstance(string_result, dict)
+        assert "result" in string_result
+        assert string_result["result"] == "Hello world"
+
+
+def test_structured_output_warning(caplog):
+    """Test that warning is logged when tool returns unparseable JSON for structured output."""
+    server_script = dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+        from typing import Any
+
+        mcp = FastMCP("Invalid Server")
+
+        @mcp.tool()
+        def invalid_tool() -> dict[str, Any]:
+            """Tool that returns invalid JSON when dict is expected."""
+            return "not valid json" # type: ignore
+
+        mcp.run()
+        '''
+    )
+
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", server_script]
+        ),
+        SmolAgentsAdapter(structured_output=True),
+    ) as tools:
+        tool = tools[0]
+
+        # Tool should still work but return error string
+        result = tool()
+        assert isinstance(result, str)
+        assert "error" in result.lower()
+
+        # Warning should be logged about unparseable JSON
+        assert any(
+            r.levelno == logging.WARNING and "unparseable" in r.message.lower()
+            for r in caplog.records
+        )
