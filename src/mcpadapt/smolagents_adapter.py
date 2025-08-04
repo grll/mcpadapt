@@ -10,33 +10,6 @@ Features:
 - Handles text, image, and audio content types
 - Backwards compatible with tools without outputSchema
 
-Example Usage:
->>> with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentsAdapter()) as tools:
->>>     print(tools)
-
->>> # Enable structured output features
->>> with MCPAdapt(server_params, SmolAgentsAdapter(structured_output=True)) as tools:
->>>     # Tools now support outputSchema, structuredContent, JSON parsing, etc.
-
-Structured Output Architecture:
-
-The adapter uses a two-level parameter system for clean separation of concerns:
-
-1. `structured_output` (Adapter-level, user-facing):
-   - Set by user when creating SmolAgentsAdapter(structured_output=True/False)
-   - Controls global behavior for all tools created by this adapter instance
-   - Determines whether to process outputSchema from MCP tools
-   - Default: False (for backwards compatibility)
-
-2. `use_structured_features` (Tool-level, internal):
-   - Passed to each individual MCPAdaptTool during creation
-   - Always equals the adapter's structured_output value
-   - Controls how each tool processes its output (structuredContent, JSON parsing, etc.)
-   - Allows each tool to operate independently without referencing parent adapter
-
-Flow: User Intent → Adapter Config → Schema Processing → Tool Creation → Tool Behavior
-      structured_output=True → self.structured_output → outputSchema extraction → use_structured_features=True → Enhanced processing
-
 Output Type Strategy:
 The adapter always uses output_type="object" for maximum flexibility, allowing smolagents
 to handle type detection at runtime. This supports all MCP content types:
@@ -171,14 +144,14 @@ class SmolAgentsAdapter(ToolAdapter):
                 inputs: dict[str, dict[str, str]],
                 output_type: str,
                 output_schema: dict[str, Any] | None = None,
-                use_structured_features: bool = False,
+                structured_output: bool = False,
             ):
                 self.name = _sanitize_function_name(name)
                 self.description = description
                 self.inputs = inputs
                 self.output_type = output_type
                 self.output_schema = output_schema
-                self.use_structured_features = use_structured_features
+                self.structured_output = structured_output
                 self.is_initialized = True
                 self.skip_forward_signature_validation = True
 
@@ -198,7 +171,7 @@ class SmolAgentsAdapter(ToolAdapter):
                     raise ValueError(f"tool {self.name} returned an empty content")
 
                 # Handle structured features if enabled
-                if self.use_structured_features:
+                if self.structured_output:
                     # Prioritize structuredContent if available
                     if hasattr(mcp_output, 'structuredContent') and mcp_output.structuredContent is not None:
                         return mcp_output.structuredContent
@@ -207,7 +180,7 @@ class SmolAgentsAdapter(ToolAdapter):
                 if len(mcp_output.content) > 1:
                     warning_msg = (
                         f"tool {self.name} returned multiple content items but no structuredContent. Using the first content item."
-                        if self.use_structured_features
+                        if self.structured_output
                         else f"tool {self.name} returned multiple content, using the first one"
                     )
                     logger.warning(warning_msg)
@@ -220,7 +193,7 @@ class SmolAgentsAdapter(ToolAdapter):
                     text_content = content_item.text
 
                     # Always try to parse JSON if structured features are enabled and structuredContent is absent
-                    if self.use_structured_features and text_content:
+                    if self.structured_output and text_content:
                         try:
                             parsed_data = json.loads(text_content)
                             return parsed_data
@@ -265,7 +238,7 @@ class SmolAgentsAdapter(ToolAdapter):
             inputs=input_schema["properties"],
             output_type=output_type,
             output_schema=output_schema,
-            use_structured_features=self.structured_output,
+            structured_output=self.structured_output,
         )
 
         return tool
