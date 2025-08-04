@@ -3,29 +3,12 @@
 SmolAgents do not support async tools, so this adapter will only work with the sync
 context manager.
 
-Features:
-- Converts MCP tools to SmolAgents tools
-- Supports outputSchema for structured output (MCP spec 2025-06-18+)
-- Always uses "object" output_type for maximum flexibility
-- Handles text, image, and audio content types
-- Backwards compatible with tools without outputSchema
+To enable structured output support (MCP spec 2025-06-18+), use:
+SmolAgentsAdapter(structured_output=True)
 
-Output Type Strategy:
-The adapter always uses output_type="object" for maximum flexibility, allowing smolagents
-to handle type detection at runtime. This supports all MCP content types:
-- TextContent (strings) → handled by smolagents runtime type detection
-- ImageContent (PIL Images) → handled by smolagents runtime type detection
-- AudioContent (torch Tensors) → handled by smolagents runtime type detection
-
-If structured_output=True, the adapter will:
-1. Use structuredContent if available from the MCP tool response
-2. Always attempt to parse JSON from text content if structuredContent is absent
-3. Fall back to returning text as-is for backwards compatibility
-
-Backwards Compatibility:
-- structured_output=False (default): Uses original simple behavior
-- structured_output=True: Enables enhanced features while maintaining fallback compatibility
-- No breaking changes to existing code
+Example Usage:
+>>> with MCPAdapt(StdioServerParameters(command="uv", args=["run", "src/echo.py"]), SmolAgentsAdapter()) as tools:
+>>>     print(tools)
 """
 
 import base64
