@@ -261,6 +261,7 @@ def test_audio_tool(shared_datadir):
         audio_content = tools[0]()
         assert isinstance(audio_content, Tensor)
 
+
 def test_structured_output_types():
     """Test that structured output returns correct types for different return annotations."""
     server_script = dedent(

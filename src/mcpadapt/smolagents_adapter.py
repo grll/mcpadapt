@@ -108,12 +108,20 @@ class SmolAgentsAdapter(ToolAdapter):
 
         # Extract and resolve outputSchema if present (only if structured_output=True)
         output_schema = None
-        if self.structured_output and hasattr(mcp_tool, 'outputSchema') and mcp_tool.outputSchema:
+        if (
+            self.structured_output
+            and hasattr(mcp_tool, "outputSchema")
+            and mcp_tool.outputSchema
+        ):
             try:
                 output_schema = jsonref.replace_refs(mcp_tool.outputSchema)
             except Exception as e:
-                logger.warning(f"Failed to resolve outputSchema for tool {mcp_tool.name}: {e}")
-                output_schema = mcp_tool.outputSchema  # Use unresolved schema as fallback
+                logger.warning(
+                    f"Failed to resolve outputSchema for tool {mcp_tool.name}: {e}"
+                )
+                output_schema = (
+                    mcp_tool.outputSchema
+                )  # Use unresolved schema as fallback
 
         # Always use "object" output_type for maximum flexibility
         # Smolagents will handle type detection at runtime
@@ -138,7 +146,9 @@ class SmolAgentsAdapter(ToolAdapter):
                 self.is_initialized = True
                 self.skip_forward_signature_validation = True
 
-            def forward(self, *args, **kwargs) -> Union[str, "PILImage", "torch.Tensor", Any]:
+            def forward(
+                self, *args, **kwargs
+            ) -> Union[str, "PILImage", "torch.Tensor", Any]:
                 if len(args) > 0:
                     if len(args) == 1 and isinstance(args[0], dict) and not kwargs:
                         mcp_output = func(args[0])
@@ -156,7 +166,10 @@ class SmolAgentsAdapter(ToolAdapter):
                 # Handle structured features if enabled
                 if self.structured_output:
                     # Prioritize structuredContent if available
-                    if hasattr(mcp_output, 'structuredContent') and mcp_output.structuredContent is not None:
+                    if (
+                        hasattr(mcp_output, "structuredContent")
+                        and mcp_output.structuredContent is not None
+                    ):
                         return mcp_output.structuredContent
 
                 # Handle multiple content warning (unified for both modes)
