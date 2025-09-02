@@ -86,7 +86,13 @@ class CrewAIAdapter(ToolAdapter):
                     else:
                         filtered_kwargs[key] = value
 
-                return func(filtered_kwargs).content[0].text  # type: ignore
+                result = func(filtered_kwargs)
+                texts = [
+                    content.text
+                    for content in result.content
+                    if hasattr(content, "text")
+                ]
+                return texts
 
             def _generate_description(self):
                 args_schema = {
