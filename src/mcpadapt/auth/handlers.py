@@ -5,7 +5,6 @@ import time
 import webbrowser
 from abc import ABC, abstractmethod
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .exceptions import (
@@ -75,7 +74,7 @@ class LocalCallbackServer:
 
     def __init__(self, port: int = 3030):
         """Initialize callback server.
-        
+
         Args:
             port: Port to listen on for OAuth callbacks
         """
@@ -96,30 +95,32 @@ class LocalCallbackServer:
 
     def start(self) -> None:
         """Start the callback server in a background thread.
-        
+
         Raises:
             OAuthCallbackError: If server cannot be started
         """
         try:
             handler_class = self._create_handler_with_data()
             self.server = HTTPServer(("localhost", self.port), handler_class)
-            self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+            self.thread = threading.Thread(
+                target=self.server.serve_forever, daemon=True
+            )
             self.thread.start()
         except OSError as e:
             if e.errno == 48:  # Address already in use
                 raise OAuthCallbackError(
                     f"Port {self.port} is already in use. Try using a different port or check if another OAuth flow is running.",
-                    context={"port": self.port, "original_error": str(e)}
+                    context={"port": self.port, "original_error": str(e)},
                 )
             else:
                 raise OAuthCallbackError(
                     f"Failed to start OAuth callback server on port {self.port}: {str(e)}",
-                    context={"port": self.port, "original_error": str(e)}
+                    context={"port": self.port, "original_error": str(e)},
                 )
         except Exception as e:
             raise OAuthCallbackError(
                 f"Unexpected error starting OAuth callback server: {str(e)}",
-                context={"port": self.port, "original_error": str(e)}
+                context={"port": self.port, "original_error": str(e)},
             )
 
     def stop(self) -> None:
@@ -132,13 +133,13 @@ class LocalCallbackServer:
 
     def wait_for_callback(self, timeout: int = 300) -> str:
         """Wait for OAuth callback with timeout.
-        
+
         Args:
             timeout: Maximum time to wait for callback in seconds
-            
+
         Returns:
             Authorization code from OAuth callback
-            
+
         Raises:
             OAuthTimeoutError: If timeout occurs
             OAuthCancellationError: If user cancels authorization
@@ -151,29 +152,20 @@ class LocalCallbackServer:
             elif self.callback_data["error"]:
                 error = self.callback_data["error"]
                 context = {"port": self.port, "timeout": timeout}
-                
+
                 # Map common OAuth error codes to specific exceptions
                 if error in ["access_denied", "user_cancelled"]:
-                    raise OAuthCancellationError(
-                        error_details=error,
-                        context=context
-                    )
+                    raise OAuthCancellationError(error_details=error, context=context)
                 else:
                     # Generic server error for other OAuth errors
-                    raise OAuthServerError(
-                        server_error=error,
-                        context=context
-                    )
+                    raise OAuthServerError(server_error=error, context=context)
             time.sleep(0.1)
-        
-        raise OAuthTimeoutError(
-            timeout_seconds=timeout,
-            context={"port": self.port}
-        )
+
+        raise OAuthTimeoutError(timeout_seconds=timeout, context={"port": self.port})
 
     def get_state(self) -> str | None:
         """Get the received state parameter.
-        
+
         Returns:
             OAuth state parameter or None
         """
@@ -182,28 +174,27 @@ class LocalCallbackServer:
 
 class BaseOAuthHandler(ABC):
     """Base class for OAuth authentication handlers.
-    
-    Combines redirect and callback handling into a single cohesive interface.
+
     Subclasses should implement both the redirect flow (opening authorization URL)
     and callback flow (receiving authorization code).
     """
-    
+
     @abstractmethod
     async def handle_redirect(self, authorization_url: str) -> None:
         """Handle OAuth redirect to authorization URL.
-        
+
         Args:
             authorization_url: The OAuth authorization URL to redirect the user to
         """
         pass
-    
+
     @abstractmethod
     async def handle_callback(self) -> tuple[str, str | None]:
         """Handle OAuth callback and return authorization code and state.
-        
+
         Returns:
             Tuple of (authorization_code, state) received from OAuth provider
-            
+
         Raises:
             Exception: If OAuth flow fails or times out
         """
@@ -212,15 +203,15 @@ class BaseOAuthHandler(ABC):
 
 class LocalBrowserOAuthHandler(BaseOAuthHandler):
     """Default OAuth handler using local browser and callback server.
-    
+
     Opens authorization URL in the user's default browser and starts a local
     HTTP server to receive the OAuth callback. This is the most user-friendly
     approach for desktop applications.
     """
-    
+
     def __init__(self, callback_port: int = 3030, timeout: int = 300):
         """Initialize the local browser OAuth handler.
-        
+
         Args:
             callback_port: Port to run the local callback server on
             timeout: Maximum time to wait for OAuth callback in seconds
@@ -228,41 +219,42 @@ class LocalBrowserOAuthHandler(BaseOAuthHandler):
         self.callback_port = callback_port
         self.timeout = timeout
         self.callback_server: LocalCallbackServer | None = None
-    
+
     async def handle_redirect(self, authorization_url: str) -> None:
         """Open authorization URL in the user's default browser.
-        
+
         Args:
             authorization_url: OAuth authorization URL to open
-            
+
         Raises:
             OAuthNetworkError: If browser cannot be opened
         """
         print(f"Opening OAuth authorization URL: {authorization_url}")
-        
+
         try:
             success = webbrowser.open(authorization_url)
             if not success:
-                print("Failed to automatically open browser. Please manually open the URL above.")
+                print(
+                    "Failed to automatically open browser. Please manually open the URL above."
+                )
                 raise OAuthNetworkError(
                     Exception("Failed to open browser - no suitable browser found"),
-                    context={"authorization_url": authorization_url}
+                    context={"authorization_url": authorization_url},
                 )
         except Exception as e:
             if isinstance(e, OAuthNetworkError):
                 raise
-            print("Failed to automatically open browser. Please manually open the URL above.")
-            raise OAuthNetworkError(
-                e,
-                context={"authorization_url": authorization_url}
+            print(
+                "Failed to automatically open browser. Please manually open the URL above."
             )
-    
+            raise OAuthNetworkError(e, context={"authorization_url": authorization_url})
+
     async def handle_callback(self) -> tuple[str, str | None]:
         """Start local server and wait for OAuth callback.
-        
+
         Returns:
             Tuple of (authorization_code, state) from OAuth callback
-            
+
         Raises:
             OAuthCallbackError: If callback server cannot be started
             OAuthTimeoutError: If callback doesn't arrive within timeout
@@ -272,12 +264,17 @@ class LocalBrowserOAuthHandler(BaseOAuthHandler):
         try:
             self.callback_server = LocalCallbackServer(port=self.callback_port)
             self.callback_server.start()
-            
+
             auth_code = self.callback_server.wait_for_callback(timeout=self.timeout)
             state = self.callback_server.get_state()
             return auth_code, state
-            
-        except (OAuthTimeoutError, OAuthCancellationError, OAuthServerError, OAuthCallbackError):
+
+        except (
+            OAuthTimeoutError,
+            OAuthCancellationError,
+            OAuthServerError,
+            OAuthCallbackError,
+        ):
             # Re-raise OAuth-specific exceptions as-is
             raise
         except Exception as e:
@@ -287,8 +284,8 @@ class LocalBrowserOAuthHandler(BaseOAuthHandler):
                 context={
                     "port": self.callback_port,
                     "timeout": self.timeout,
-                    "original_error": str(e)
-                }
+                    "original_error": str(e),
+                },
             )
         finally:
             if self.callback_server:

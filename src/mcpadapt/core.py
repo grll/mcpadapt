@@ -20,7 +20,6 @@ from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 
-from .auth.exceptions import OAuthError
 from .auth.providers import ApiKeyAuthProvider, BearerAuthProvider, get_auth_headers
 
 
@@ -106,7 +105,7 @@ async def mcptools(
         # Create a deep copy to avoid modifying the original dict
         client_params = copy.deepcopy(serverparams)
         transport = client_params.pop("transport", "sse")
-        
+
         # Add authentication if provided
         if auth_provider is not None:
             if isinstance(auth_provider, OAuthClientProvider):
@@ -118,7 +117,7 @@ async def mcptools(
                     client_params["headers"].update(headers)
                 else:
                     client_params["headers"] = headers
-        
+
         if transport == "sse":
             client = sse_client(**client_params)
         elif transport == "streamable-http":
@@ -199,7 +198,11 @@ class MCPAdapt:
         adapter: ToolAdapter,
         connect_timeout: int = 30,
         client_session_timeout_seconds: float | timedelta | None = 5,
-        auth_provider: OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | list[OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | None] | None = None,
+        auth_provider: OAuthClientProvider
+        | ApiKeyAuthProvider
+        | BearerAuthProvider
+        | list[OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | None]
+        | None = None,
     ):
         """
         Manage the MCP server / client lifecycle and expose tools adapted with the adapter.
@@ -259,9 +262,13 @@ class MCPAdapt:
             async with AsyncExitStack() as stack:
                 connections = [
                     await stack.enter_async_context(
-                        mcptools(params, self.client_session_timeout_seconds, auth_provider)
+                        mcptools(
+                            params, self.client_session_timeout_seconds, auth_provider
+                        )
                     )
-                    for params, auth_provider in zip(self.serverparams, self.auth_providers)
+                    for params, auth_provider in zip(
+                        self.serverparams, self.auth_providers
+                    )
                 ]
                 self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
                 self.ready.set()  # Signal initialization is complete

@@ -8,7 +8,7 @@ class ApiKeyAuthProvider:
 
     def __init__(self, header_name: str, header_value: str):
         """Initialize with API key configuration.
-        
+
         Args:
             header_name: Name of the header to send the API key in
             header_value: The API key value
@@ -18,7 +18,7 @@ class ApiKeyAuthProvider:
 
     def get_headers(self) -> dict[str, str]:
         """Get authentication headers.
-        
+
         Returns:
             Dictionary of headers to add to requests
         """
@@ -30,7 +30,7 @@ class BearerAuthProvider:
 
     def __init__(self, token: str):
         """Initialize with Bearer token configuration.
-        
+
         Args:
             token: The bearer token
         """
@@ -38,7 +38,7 @@ class BearerAuthProvider:
 
     def get_headers(self) -> dict[str, str]:
         """Get authentication headers.
-        
+
         Returns:
             Dictionary of headers to add to requests
         """
@@ -47,10 +47,10 @@ class BearerAuthProvider:
 
 def get_auth_headers(auth_provider: Any) -> dict[str, str]:
     """Get authentication headers from provider.
-    
+
     Args:
         auth_provider: Authentication provider instance
-        
+
     Returns:
         Dictionary of headers to add to requests
     """

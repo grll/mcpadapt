@@ -3,10 +3,12 @@
 
 class OAuthError(Exception):
     """Base class for all OAuth authentication errors."""
-    
-    def __init__(self, message: str, error_code: str | None = None, context: dict | None = None):
+
+    def __init__(
+        self, message: str, error_code: str | None = None, context: dict | None = None
+    ):
         """Initialize OAuth error.
-        
+
         Args:
             message: Human-readable error message
             error_code: Machine-readable error code (optional)
@@ -19,7 +21,7 @@ class OAuthError(Exception):
 
 class OAuthTimeoutError(OAuthError):
     """Raised when OAuth callback doesn't arrive within the specified timeout."""
-    
+
     def __init__(self, timeout_seconds: int, context: dict | None = None):
         message = (
             f"OAuth authentication timed out after {timeout_seconds} seconds. "
@@ -32,7 +34,7 @@ class OAuthTimeoutError(OAuthError):
 
 class OAuthCancellationError(OAuthError):
     """Raised when the user cancels or denies the OAuth authorization."""
-    
+
     def __init__(self, error_details: str | None = None, context: dict | None = None):
         base_message = "OAuth authorization was cancelled or denied by the user."
         if error_details:
@@ -45,7 +47,7 @@ class OAuthCancellationError(OAuthError):
 
 class OAuthNetworkError(OAuthError):
     """Raised when network-related issues prevent OAuth completion."""
-    
+
     def __init__(self, original_error: Exception, context: dict | None = None):
         message = (
             f"OAuth authentication failed due to network error: {str(original_error)}. "
@@ -57,7 +59,7 @@ class OAuthNetworkError(OAuthError):
 
 class OAuthConfigurationError(OAuthError):
     """Raised when OAuth configuration is invalid or incomplete."""
-    
+
     def __init__(self, config_issue: str, context: dict | None = None):
         message = f"OAuth configuration error: {config_issue}"
         super().__init__(message, "oauth_config_error", context)
@@ -66,8 +68,13 @@ class OAuthConfigurationError(OAuthError):
 
 class OAuthServerError(OAuthError):
     """Raised when the OAuth server returns an error response."""
-    
-    def __init__(self, server_error: str, error_description: str | None = None, context: dict | None = None):
+
+    def __init__(
+        self,
+        server_error: str,
+        error_description: str | None = None,
+        context: dict | None = None,
+    ):
         message = f"OAuth server error: {server_error}"
         if error_description:
             message += f" - {error_description}"
@@ -78,7 +85,7 @@ class OAuthServerError(OAuthError):
 
 class OAuthCallbackError(OAuthError):
     """Raised when there's an issue with the OAuth callback handling."""
-    
+
     def __init__(self, callback_issue: str, context: dict | None = None):
         message = f"OAuth callback error: {callback_issue}"
         super().__init__(message, "oauth_callback_error", context)
