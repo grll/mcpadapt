@@ -178,7 +178,7 @@ def test_basic_sync(echo_server_script):
     ) as tools:
         assert len(tools) == 1
         assert tools[0].name == "echo_tool"
-        assert tools[0].run(text="hello") == "Echo: hello"
+        assert tools[0].run(text="hello") == ["Echo: hello"]
 
 
 # Fails if enums, unions, or pydantic classes are not included in the
@@ -235,7 +235,7 @@ def test_basic_sync_sse(echo_sse_server):
     ) as tools:
         assert len(tools) == 1
         assert tools[0].name == "echo_tool"
-        assert tools[0].run(text="hello") == "Echo: hello"
+        assert tools[0].run(text="hello") == ["Echo: hello"]
 
 
 def test_optional_sync(echo_server_optional_script):
@@ -247,13 +247,13 @@ def test_optional_sync(echo_server_optional_script):
     ) as tools:
         assert len(tools) == 3
         assert tools[0].name == "echo_tool_optional"
-        assert tools[0].run(text="hello") == "Echo: hello"
+        assert tools[0].run(text="hello") == ["Echo: hello"]
         assert tools[0].run() == "No input provided"
         assert tools[1].name == "echo_tool_default_value"
-        assert tools[1].run(text="hello") == "Echo: hello"
+        assert tools[1].run(text="hello") == ["Echo: hello"]
         assert tools[1].run() == "Echo: empty"
         assert tools[2].name == "echo_tool_union_none"
-        assert tools[2].run(text="hello") == "Echo: hello"
+        assert tools[2].run(text="hello") == ["Echo: hello"]
 
 
 @pytest.fixture
@@ -345,13 +345,13 @@ def test_none_values_filtered_from_kwargs(mcp_server_that_rejects_none_script):
 
         # This should work - only required parameter
         result = tool.run(required="test")
-        assert "Required: test" in result
+        assert "Required: test" in result[0]
 
         # This should work - explicit non-None values
         result = tool.run(required="test", optional="value1", another_optional="value2")
-        assert "Required: test" in result
-        assert "Optional: value1" in result
-        assert "Another: value2" in result
+        assert "Required: test" in result[0]
+        assert "Optional: value1" in result[0]
+        assert "Another: value2" in result[0]
 
         # After the fix - CrewAI passes None values but they are filtered out
         # before being sent to the MCP server if the schema doesn't allow null
@@ -359,8 +359,8 @@ def test_none_values_filtered_from_kwargs(mcp_server_that_rejects_none_script):
 
         # The fix filters out None values, so the server receives only {"required": "test"}
         # and returns a successful response with None for the optional parameters
-        assert "Required: test" in result
-        assert "Optional: None" in result
-        assert "Another: None" in result
+        assert "Required: test" in result[0]
+        assert "Optional: None" in result[0]
+        assert "Another: None" in result[0]
         # Most importantly, no error message about "is not of type string, is <nil>"
-        assert "parameter" not in result or "is <nil>" not in result
+        assert "parameter" not in result[0] or "is <nil>" not in result[0]
