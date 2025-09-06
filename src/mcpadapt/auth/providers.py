@@ -1,25 +1,20 @@
-"""Authentication provider factory and integration logic."""
+"""Authentication provider classes for MCPAdapt."""
 
 from typing import Any
-from urllib.parse import urlparse
-
-from mcp.client.auth import OAuthClientProvider
-
-from .handlers import default_callback_handler, default_redirect_handler
-from .oauth import InMemoryTokenStorage
-from .models import ApiKeyConfig, AuthConfig, BearerAuthConfig, OAuthConfig
 
 
 class ApiKeyAuthProvider:
     """Simple API key authentication provider."""
 
-    def __init__(self, config: ApiKeyConfig):
+    def __init__(self, header_name: str, header_value: str):
         """Initialize with API key configuration.
         
         Args:
-            config: API key configuration
+            header_name: Name of the header to send the API key in
+            header_value: The API key value
         """
-        self.config = config
+        self.header_name = header_name
+        self.header_value = header_value
 
     def get_headers(self) -> dict[str, str]:
         """Get authentication headers.
@@ -27,19 +22,19 @@ class ApiKeyAuthProvider:
         Returns:
             Dictionary of headers to add to requests
         """
-        return {self.config.header_name: self.config.header_value}
+        return {self.header_name: self.header_value}
 
 
 class BearerAuthProvider:
     """Simple Bearer token authentication provider."""
 
-    def __init__(self, config: BearerAuthConfig):
+    def __init__(self, token: str):
         """Initialize with Bearer token configuration.
         
         Args:
-            config: Bearer token configuration
+            token: The bearer token
         """
-        self.config = config
+        self.token = token
 
     def get_headers(self) -> dict[str, str]:
         """Get authentication headers.
@@ -47,49 +42,7 @@ class BearerAuthProvider:
         Returns:
             Dictionary of headers to add to requests
         """
-        return {"Authorization": f"Bearer {self.config.token}"}
-
-
-async def create_auth_provider(
-    auth_config: AuthConfig, server_url: str
-) -> OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider:
-    """Factory function to create appropriate auth provider from config.
-    
-    Args:
-        auth_config: Authentication configuration
-        server_url: Server URL for OAuth (needed to determine OAuth server endpoint)
-        
-    Returns:
-        Appropriate auth provider instance
-        
-    Raises:
-        ValueError: If auth configuration type is not supported
-    """
-    if isinstance(auth_config, OAuthConfig):
-        # Use provided handlers or default ones
-        callback_handler = auth_config.callback_handler or default_callback_handler
-        redirect_handler = auth_config.redirect_handler or default_redirect_handler
-        
-        # Create OAuth provider with domain root only
-        parsed_url = urlparse(server_url)
-        oauth_server_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        
-        return OAuthClientProvider(
-            server_url=oauth_server_url,
-            client_metadata=auth_config.client_metadata,
-            storage=InMemoryTokenStorage(),
-            redirect_handler=redirect_handler,
-            callback_handler=callback_handler,
-        )
-    
-    elif isinstance(auth_config, ApiKeyConfig):
-        return ApiKeyAuthProvider(auth_config)
-    
-    elif isinstance(auth_config, BearerAuthConfig):
-        return BearerAuthProvider(auth_config)
-    
-    else:
-        raise ValueError(f"Unsupported auth configuration type: {type(auth_config)}")
+        return {"Authorization": f"Bearer {self.token}"}
 
 
 def get_auth_headers(auth_provider: Any) -> dict[str, str]:

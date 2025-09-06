@@ -20,8 +20,8 @@ from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 
-from .auth import AuthConfig, create_auth_provider, get_auth_headers
-from .auth.providers import ApiKeyAuthProvider, BearerAuthProvider
+from .auth.exceptions import OAuthError
+from .auth.providers import ApiKeyAuthProvider, BearerAuthProvider, get_auth_headers
 
 
 class ToolAdapter(ABC):
@@ -199,7 +199,7 @@ class MCPAdapt:
         adapter: ToolAdapter,
         connect_timeout: int = 30,
         client_session_timeout_seconds: float | timedelta | None = 5,
-        auth_config: AuthConfig | list[AuthConfig | None] | None = None,
+        auth_provider: OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | list[OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | None] | None = None,
     ):
         """
         Manage the MCP server / client lifecycle and expose tools adapted with the adapter.
@@ -210,7 +210,7 @@ class MCPAdapt:
             adapter (ToolAdapter): Adapter to use to convert MCP tools call into agentic framework tools.
             connect_timeout (int): Connection timeout in seconds to the mcp server (default is 30s).
             client_session_timeout_seconds: Timeout for MCP ClientSession calls
-            auth_config: Optional authentication configuration. Can be a single config for all servers,
+            auth_provider: Optional authentication provider. Can be a single provider for all servers,
                         a list matching serverparams length, or None for no authentication.
 
         Raises:
@@ -224,23 +224,22 @@ class MCPAdapt:
 
         self.adapter = adapter
 
-        # Handle auth_config - ensure it matches serverparams length
-        if auth_config is None:
-            self.auth_configs = [None] * len(self.serverparams)
-        elif isinstance(auth_config, list):
-            if len(auth_config) != len(self.serverparams):
+        # Handle auth_provider - ensure it matches serverparams length
+        if auth_provider is None:
+            self.auth_providers = [None] * len(self.serverparams)
+        elif isinstance(auth_provider, list):
+            if len(auth_provider) != len(self.serverparams):
                 raise ValueError(
-                    f"auth_config list length ({len(auth_config)}) must match serverparams length ({len(self.serverparams)})"
+                    f"auth_provider list length ({len(auth_provider)}) must match serverparams length ({len(self.serverparams)})"
                 )
-            self.auth_configs = auth_config
+            self.auth_providers = auth_provider
         else:
-            # Single auth config for all servers
-            self.auth_configs = [auth_config] * len(self.serverparams)
+            # Single auth provider for all servers
+            self.auth_providers = [auth_provider] * len(self.serverparams)
 
         # session and tools get set by the async loop during initialization.
         self.sessions: list[ClientSession] = []
         self.mcp_tools: list[list[mcp.types.Tool]] = []
-        self.auth_providers: list[Any] = []
 
         # all attributes used to manage the async loop and separate thread.
         self.loop = asyncio.new_event_loop()
@@ -257,20 +256,6 @@ class MCPAdapt:
         asyncio.set_event_loop(self.loop)
 
         async def setup():
-            # Create auth providers if needed (only if not already provided)
-            if not self.auth_providers:
-                auth_providers = []
-                for params, auth_config in zip(self.serverparams, self.auth_configs):
-                    if auth_config is not None:
-                        # Get server URL from params for OAuth
-                        server_url = params.get("url", "") if isinstance(params, dict) else ""
-                        auth_provider = await create_auth_provider(auth_config, server_url)
-                        auth_providers.append(auth_provider)
-                    else:
-                        auth_providers.append(None)
-                
-                self.auth_providers = auth_providers
-
             async with AsyncExitStack() as stack:
                 connections = [
                     await stack.enter_async_context(
@@ -379,20 +364,6 @@ class MCPAdapt:
 
     async def __aenter__(self) -> list[Any]:
         self._ctxmanager = AsyncExitStack()
-
-        # Create auth providers if needed (only if not already provided)
-        if not self.auth_providers:
-            auth_providers = []
-            for params, auth_config in zip(self.serverparams, self.auth_configs):
-                if auth_config is not None:
-                    # Get server URL from params for OAuth
-                    server_url = params.get("url", "") if isinstance(params, dict) else ""
-                    auth_provider = await create_auth_provider(auth_config, server_url)
-                    auth_providers.append(auth_provider)
-                else:
-                    auth_providers.append(None)
-            
-            self.auth_providers = auth_providers
 
         connections = [
             await self._ctxmanager.enter_async_context(
