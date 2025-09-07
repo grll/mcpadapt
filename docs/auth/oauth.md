@@ -15,10 +15,8 @@ The built in provider helps you perform the following sequence:
 ## Basic OAuth Setup
 
 ```python
-from pydantic import HttpUrl
-
 from mcpadapt.auth import (
-    OAuthClientProvider,
+    OAuthProvider,
     OAuthClientMetadata,
     InMemoryTokenStorage,
     LocalBrowserOAuthHandler,
@@ -26,26 +24,29 @@ from mcpadapt.auth import (
 from mcpadapt.core import MCPAdapt
 from mcpadapt.smolagents_adapter import SmolAgentsAdapter
 
-# Configure client metadata
+# Configure client metadata (no need to specify redirect_uris - handled automatically)
 client_metadata = OAuthClientMetadata(
     client_name="My Application",
-    redirect_uris=[HttpUrl("http://localhost:3030/callback")],
     grant_types=["authorization_code", "refresh_token"],
     response_types=["code"],
     token_endpoint_auth_method="client_secret_post",
 )
 
-# Set up OAuth components
-oauth_handler = LocalBrowserOAuthHandler(callback_port=3030)
+# Create OAuth handler with metadata
+oauth_handler = LocalBrowserOAuthHandler(
+    client_metadata=client_metadata,
+    callback_port=3030,
+    timeout=300
+)
+
+# Set up token storage
 token_storage = InMemoryTokenStorage()
 
-# Create OAuth provider
-oauth_provider = OAuthClientProvider(
+# Create simplified OAuth provider
+oauth_provider = OAuthProvider(
     server_url="https://oauth-server.com",
-    client_metadata=client_metadata,
+    oauth_handler=oauth_handler,
     storage=token_storage,
-    redirect_handler=oauth_handler.handle_redirect,
-    callback_handler=oauth_handler.handle_callback,
 )
 
 # Use with MCPAdapt
@@ -62,7 +63,7 @@ with MCPAdapt(
 
 ### OAuthClientMetadata
 
-Configure your application's OAuth settings:
+Configure your application's OAuth settings
 
 ```python
 from pydantic import HttpUrl
@@ -70,7 +71,6 @@ from mcpadapt.auth import OAuthClientMetadata
 
 client_metadata = OAuthClientMetadata(
     client_name="Your App Name",
-    redirect_uris=[HttpUrl("http://localhost:3030/callback")],
     grant_types=["authorization_code", "refresh_token"],
     response_types=["code"],
     token_endpoint_auth_method="client_secret_post",
@@ -83,16 +83,25 @@ client_metadata = OAuthClientMetadata(
 
 ### LocalBrowserOAuthHandler
 
-Handles the OAuth flow using the user's browser:
+Handles the OAuth flow using the user's browser (now requires client metadata):
 
 ```python
-from mcpadapt.auth import LocalBrowserOAuthHandler
+from mcpadapt.auth import LocalBrowserOAuthHandler, OAuthClientMetadata
+
+# Create client metadata first
+client_metadata = OAuthClientMetadata(
+    client_name="Your App Name",
+    grant_types=["authorization_code", "refresh_token"],
+    response_types=["code"],
+    token_endpoint_auth_method="client_secret_post",
+)
 
 # Default configuration
-oauth_handler = LocalBrowserOAuthHandler()
+oauth_handler = LocalBrowserOAuthHandler(client_metadata)
 
 # Custom configuration
 oauth_handler = LocalBrowserOAuthHandler(
+    client_metadata,
     callback_port=8080,  # Custom port
     timeout=600,         # 10 minute timeout
 )
@@ -120,7 +129,7 @@ from pydantic import HttpUrl
 from mcp.shared.auth import OAuthClientInformationFull
 
 from mcpadapt.auth import (
-    OAuthClientProvider,
+    OAuthProvider,
     OAuthClientMetadata,
     InMemoryTokenStorage,
     LocalBrowserOAuthHandler,
@@ -144,22 +153,23 @@ token_storage = InMemoryTokenStorage(client_info=client_info)
 # Configure client metadata (still needed for OAuth flow)
 client_metadata = OAuthClientMetadata(
     client_name="My Pre-configured App",
-    redirect_uris=[HttpUrl(REDIRECT_URI)],
     grant_types=["authorization_code", "refresh_token"],
     response_types=["code"],
     token_endpoint_auth_method="client_secret_post",
 )
 
-# Set up OAuth handler
-oauth_handler = LocalBrowserOAuthHandler(callback_port=3030)
-
-# Create OAuth provider
-oauth_provider = OAuthClientProvider(
-    server_url="https://oauth-server.com",
+# Create OAuth handler with metadata
+oauth_handler = LocalBrowserOAuthHandler(
     client_metadata=client_metadata,
+    callback_port=3030,
+    timeout=300
+)
+
+# Create simplified OAuth provider
+oauth_provider = OAuthProvider(
+    server_url="https://oauth-server.com",
+    oauth_handler=oauth_handler,
     storage=token_storage,  # Contains pre-configured credentials
-    redirect_handler=oauth_handler.handle_redirect,
-    callback_handler=oauth_handler.handle_callback,
 )
 
 # Use with MCPAdapt - DCR will be skipped
@@ -179,36 +189,6 @@ Use pre-configured credentials when:
 - **Existing OAuth app**: You already have a registered OAuth application with client credentials
 - **Compliance requirements**: Your organization requires using specific pre-registered applications
 
-### Environment Variables for Credentials
-
-Store your OAuth credentials securely using environment variables:
-
-```bash
-# Set environment variables
-export OAUTH_CLIENT_ID="your-actual-client-id"
-export OAUTH_CLIENT_SECRET="your-actual-client-secret"
-export OAUTH_REDIRECT_URI="http://localhost:3030/callback"
-```
-
-Then reference them in your code:
-
-```python
-import os
-from pydantic import HttpUrl
-from mcp.shared.auth import OAuthClientInformationFull
-from mcpadapt.auth import InMemoryTokenStorage
-
-# Load from environment
-client_info = OAuthClientInformationFull(
-    client_id=os.getenv("OAUTH_CLIENT_ID"),
-    client_secret=os.getenv("OAUTH_CLIENT_SECRET"),
-    redirect_uris=[HttpUrl(os.getenv("OAUTH_REDIRECT_URI", "http://localhost:3030/callback"))]
-)
-
-# Create storage with pre-configured credentials
-token_storage = InMemoryTokenStorage(client_info=client_info)
-```
-
 ### Complete Example
 
 See `examples/oauth_with_credentials_example.py` for a complete working example of using pre-configured OAuth credentials.
@@ -218,26 +198,46 @@ See `examples/oauth_with_credentials_example.py` for a complete working example 
 Create custom OAuth handlers for production environments or when you are integrating into a larger app:
 
 ```python
-from mcpadapt.auth import BaseOAuthHandler
+from mcpadapt.auth import BaseOAuthHandler, OAuthProvider, OAuthClientMetadata
+from typing import List
+from pydantic import HttpUrl
 
-class HeadlessOAuthHandler(BaseOAuthHandler):
-    """OAuth handler for headless environments."""
+class CustomOAuthHandler(BaseOAuthHandler):
+    """Custom OAuth handler with different callback port."""
+    
+    def __init__(self, client_metadata: OAuthClientMetadata, callback_port: int = 8080):
+        super().__init__(client_metadata)
+        self.callback_port = callback_port
+    
+    def get_redirect_uris(self) -> List[HttpUrl]:
+        """Return redirect URIs for this handler."""
+        return [HttpUrl(f"http://localhost:{self.callback_port}/oauth/callback")]
     
     async def handle_redirect(self, authorization_url: str) -> None:
-        print(f"Open this URL in your browser: {authorization_url}")
+        print(f"Please open this URL in your browser: {authorization_url}")
+        # Custom logging or integration logic here
     
     async def handle_callback(self) -> tuple[str, str | None]:
-        auth_code = input("Enter the authorization code: ")
+        # Custom callback handling logic
+        print("Waiting for OAuth callback...")
+        # In a real implementation, you'd set up your own server or integration
+        auth_code = input("Enter the authorization code from the callback: ")
         return auth_code, None
 
-# Use custom handler
-custom_handler = HeadlessOAuthHandler()
-oauth_provider = OAuthClientProvider(
+# Create client metadata
+client_metadata = OAuthClientMetadata(
+    client_name="Custom OAuth App",
+    grant_types=["authorization_code", "refresh_token"],
+    response_types=["code"],
+    token_endpoint_auth_method="client_secret_post",
+)
+
+# Use custom handler with the new interface
+custom_handler = CustomOAuthHandler(client_metadata, callback_port=8080)
+oauth_provider = OAuthProvider(
     server_url="https://oauth-server.com",
-    client_metadata=client_metadata,
+    oauth_handler=custom_handler,
     storage=token_storage,
-    redirect_handler=custom_handler.handle_redirect,
-    callback_handler=custom_handler.handle_callback,
 )
 ```
 
@@ -345,16 +345,3 @@ except OAuthError as e:
     if e.context:
         print(f"Context: {e.context}")
 ```
-
-## Configuration Tips
-
-### Port Selection
-- Default port is 3030
-- Ensure the port is available and not blocked by firewalls
-- Use different ports for different applications
-
-## Security Considerations
-
-- Store tokens securely in production environments, you may want to use something like Vault
-- Use HTTPS for all OAuth flows in production
-- Use appropriate OAuth scopes (minimal permissions)

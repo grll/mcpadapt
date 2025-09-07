@@ -1,15 +1,21 @@
 # Creating Custom Handlers
 
-Custom OAuth handlers allow you to implement specialized authentication flows for different environments and use cases.
+Custom OAuth handlers allow you to implement specialized authentication flows that are specific to how your application handles OAuth Redirects.
 
 ## BaseOAuthHandler Interface
 
-All custom OAuth handlers must extend the `BaseOAuthHandler` abstract class:
+All custom OAuth handlers must extend the `BaseOAuthHandler` abstract class and implement the required methods:
 
 ```python
-from mcpadapt.auth import BaseOAuthHandler
+from mcpadapt.auth import BaseOAuthHandler, OAuthClientMetadata
+from typing import List
+from pydantic import AnyUrl
 
 class CustomOAuthHandler(BaseOAuthHandler):
+    def get_redirect_uris(self) -> List[AnyUrl]:
+        """Return redirect URIs that this handler can process."""
+        return [AnyUrl("http://localhost:8080/callback")]
+    
     async def handle_redirect(self, authorization_url: str) -> None:
         """Handle OAuth redirect to authorization URL."""
         # Your custom redirect logic here
@@ -26,10 +32,16 @@ class CustomOAuthHandler(BaseOAuthHandler):
 For server environments without a browser:
 
 ```python
-from mcpadapt.auth import BaseOAuthHandler
+from mcpadapt.auth import BaseOAuthHandler, OAuthClientMetadata
+from typing import List
+from pydantic import AnyUrl
 
 class HeadlessOAuthHandler(BaseOAuthHandler):
     """OAuth handler for headless environments."""
+    
+    def get_redirect_uris(self) -> List[AnyUrl]:
+        """Return out-of-band redirect for headless environments."""
+        return [AnyUrl("urn:ietf:wg:oauth:2.0:oob")]
     
     async def handle_redirect(self, authorization_url: str) -> None:
         print(f"Please open this URL in your browser:")
@@ -47,16 +59,23 @@ class HeadlessOAuthHandler(BaseOAuthHandler):
 For applications with existing web servers:
 
 ```python
-from mcpadapt.auth import BaseOAuthHandler
+from mcpadapt.auth import BaseOAuthHandler, OAuthClientMetadata
+from typing import List
+from pydantic import AnyUrl
 import asyncio
 
 class CustomCallbackHandler(BaseOAuthHandler):
     """OAuth handler that integrates with existing web application."""
     
-    def __init__(self, callback_url: str):
+    def __init__(self, client_metadata: OAuthClientMetadata, callback_url: str):
+        super().__init__(client_metadata)
         self.callback_url = callback_url
         self.callback_data = {}
         self.callback_received = asyncio.Event()
+    
+    def get_redirect_uris(self) -> List[AnyUrl]:
+        """Return custom callback URL."""
+        return [AnyUrl(self.callback_url)]
     
     async def handle_redirect(self, authorization_url: str) -> None:
         # In a real app, you might redirect the user's current request
@@ -86,15 +105,23 @@ class CustomCallbackHandler(BaseOAuthHandler):
 For command-line applications:
 
 ```python
-from mcpadapt.auth import BaseOAuthHandler
+from mcpadapt.auth import BaseOAuthHandler, OAuthClientMetadata
+from typing import List
+from pydantic import AnyUrl
 import webbrowser
 import urllib.parse
 
 class CLIHandler(BaseOAuthHandler):
     """OAuth handler optimized for CLI applications."""
     
-    def __init__(self, auto_open_browser: bool = True):
+    def __init__(self, client_metadata: OAuthClientMetadata, callback_port: int = 3030, auto_open_browser: bool = True):
+        super().__init__(client_metadata)
+        self.callback_port = callback_port
         self.auto_open_browser = auto_open_browser
+    
+    def get_redirect_uris(self) -> List[AnyUrl]:
+        """Return localhost callback URL."""
+        return [AnyUrl(f"http://localhost:{self.callback_port}/callback")]
     
     async def handle_redirect(self, authorization_url: str) -> None:
         if self.auto_open_browser:
@@ -128,28 +155,25 @@ class CLIHandler(BaseOAuthHandler):
 ## Using Custom Handlers
 
 ```python
-from mcpadapt.auth import OAuthClientProvider, OAuthClientMetadata, InMemoryTokenStorage
+from mcpadapt.auth import OAuthProvider, OAuthClientMetadata, InMemoryTokenStorage
 from mcpadapt.core import MCPAdapt
 from mcpadapt.smolagents_adapter import SmolAgentsAdapter
-from pydantic import HttpUrl
 
-# Use your custom handler
-custom_handler = HeadlessOAuthHandler()
-
+# Create client metadata
 client_metadata = OAuthClientMetadata(
     client_name="My Application",
-    redirect_uris=[HttpUrl("http://localhost:3030/callback")],
     grant_types=["authorization_code", "refresh_token"],
     response_types=["code"],
     token_endpoint_auth_method="client_secret_post",
 )
 
-oauth_provider = OAuthClientProvider(
+# Use your custom handler with the new interface
+custom_handler = HeadlessOAuthHandler(client_metadata)
+
+oauth_provider = OAuthProvider(
     server_url="https://oauth-server.com",
-    client_metadata=client_metadata,
+    oauth_handler=custom_handler,
     storage=InMemoryTokenStorage(),
-    redirect_handler=custom_handler.handle_redirect,
-    callback_handler=custom_handler.handle_callback,
 )
 
 with MCPAdapt(

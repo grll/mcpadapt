@@ -5,32 +5,37 @@ Get authentication working quickly with these minimal examples.
 ## OAuth 2.0 with a provider like Canva
 
 ```python
-from mcp.client.auth import OAuthClientProvider
-from mcp.shared.auth import OAuthClientMetadata
-from pydantic import HttpUrl
-
-from mcpadapt.auth import InMemoryTokenStorage, LocalBrowserOAuthHandler
+from mcpadapt.auth import (
+    OAuthProvider,
+    OAuthClientMetadata,
+    InMemoryTokenStorage,
+    LocalBrowserOAuthHandler,
+)
 from mcpadapt.core import MCPAdapt
 from mcpadapt.smolagents_adapter import SmolAgentsAdapter
 
-# Configure OAuth
+# Configure OAuth (no need to specify redirect_uris - handled automatically)
 client_metadata = OAuthClientMetadata(
     client_name="My App",
-    redirect_uris=[HttpUrl("http://localhost:3030/callback")],
     grant_types=["authorization_code", "refresh_token"],
     response_types=["code"],
     token_endpoint_auth_method="client_secret_post",
 )
 
-oauth_handler = LocalBrowserOAuthHandler(callback_port=3030)
+# Create OAuth handler with metadata
+oauth_handler = LocalBrowserOAuthHandler(
+    client_metadata=client_metadata,
+    callback_port=3030,
+    timeout=300
+)
+
 token_storage = InMemoryTokenStorage()
 
-oauth_provider = OAuthClientProvider(
+# Create simplified OAuth provider
+oauth_provider = OAuthProvider(
     server_url="https://mcp.canva.com",
-    client_metadata=client_metadata,
+    oauth_handler=oauth_handler,
     storage=token_storage,
-    redirect_handler=oauth_handler.handle_redirect,
-    callback_handler=oauth_handler.handle_callback,
 )
 
 # Use with MCPAdapt

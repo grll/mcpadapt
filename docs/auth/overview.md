@@ -16,7 +16,7 @@ Standard Bearer token authentication for JWT-based systems and modern API patter
 ## Core Components
 
 **Authentication Providers:**
-- `OAuthClientProvider` - OAuth 2.0 authentication
+- `OAuthProvider` - OAuth 2.0 authentication 
 - `ApiKeyAuthProvider` - API key authentication  
 - `BearerAuthProvider` - Bearer token authentication
 
@@ -49,13 +49,3 @@ with MCPAdapt(
     # Authentication handled automatically
     result = tools[0]({"param": "value"})
 ```
-
-## Next Steps
-
-- [Quick Start Guide](quickstart.md) - Get started immediately
-- [OAuth 2.0 Guide](oauth.md) - Complete OAuth implementation
-- [API Key Guide](api-key.md) - Key-based authentication
-- [Bearer Token Guide](bearer-token.md) - Token authentication
-- [Custom Handlers](custom-handlers.md) - Custom authentication flows
-- [Error Handling](error-handling.md) - Handle authentication errors
-- [Examples](examples.md) - Real-world examples

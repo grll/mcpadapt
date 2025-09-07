@@ -96,14 +96,6 @@ with MCPAdapt(
 ```python
 ApiKeyAuthProvider("X-API-Key", "abc123def456")
 ```
-
-### Prefixed API Key
-
-```python
-ApiKeyAuthProvider("X-API-Key", "Bearer abc123def456")
-ApiKeyAuthProvider("Authorization", "API-Key abc123def456")
-```
-
 ### Base64 Encoded Credentials
 
 ```python
@@ -111,39 +103,4 @@ import base64
 
 credentials = base64.b64encode(b"username:password").decode()
 ApiKeyAuthProvider("Authorization", f"Basic {credentials}")
-```
-
-## Best Practices
-
-### Security
-- Never hard-code API keys in source code
-- Use environment variables or secure configuration files
-- Rotate API keys regularly
-- Use the principle of least privilege for API key permissions
-
-### Configuration
-- Use descriptive environment variable names
-- Document required API keys in your README
-- Provide clear error messages for missing keys
-- Validate API key format before using
-
-## Integration Examples
-
-### With Different Frameworks
-
-```python
-# SmolAgents
-from mcpadapt.smolagents_adapter import SmolAgentsAdapter
-adapter = SmolAgentsAdapter()
-
-# CrewAI
-from mcpadapt.crewai_adapter import CrewAIAdapter
-adapter = CrewAIAdapter()
-
-# LangChain
-from mcpadapt.langchain_adapter import LangChainAdapter
-adapter = LangChainAdapter()
-
-# All use the same API key provider
-api_key_provider = ApiKeyAuthProvider("X-API-Key", os.getenv("API_KEY"))
 ```

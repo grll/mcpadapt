@@ -1,6 +1,8 @@
 """Authentication provider classes for MCPAdapt."""
 
 from typing import Any
+from mcp.client.auth import OAuthClientProvider, TokenStorage
+from .handlers import BaseOAuthHandler
 
 
 class ApiKeyAuthProvider:
@@ -43,6 +45,30 @@ class BearerAuthProvider:
             Dictionary of headers to add to requests
         """
         return {"Authorization": f"Bearer {self.token}"}
+
+
+class OAuthProvider(OAuthClientProvider):
+    """OAuth provider that accepts a handler directly.
+    
+    This class simplifies OAuth configuration by taking an OAuthHandler
+    and internally extracting the client metadata and callback handlers.
+    """
+    
+    def __init__(self, server_url: str, oauth_handler: BaseOAuthHandler, storage: TokenStorage):
+        """Initialize OAuth provider with handler.
+        
+        Args:
+            server_url: MCP server URL
+            oauth_handler: OAuth handler containing all configuration
+            storage: Token storage implementation
+        """
+        super().__init__(
+            server_url=server_url,
+            client_metadata=oauth_handler.get_client_metadata(),
+            storage=storage,
+            redirect_handler=oauth_handler.handle_redirect,
+            callback_handler=oauth_handler.handle_callback,
+        )
 
 
 def get_auth_headers(auth_provider: Any) -> dict[str, str]:

@@ -7,8 +7,6 @@ The Canva MCP server provides tools for creating and managing Canva designs.
 It fully complies with OAuth 2.0 Dynamic Client Registration
 """
 
-from pydantic import HttpUrl
-
 from mcpadapt.auth import (
     InMemoryTokenStorage,
     LocalBrowserOAuthHandler,
@@ -16,7 +14,7 @@ from mcpadapt.auth import (
     OAuthCancellationError,
     OAuthNetworkError,
     OAuthConfigurationError,
-    OAuthClientProvider,
+    OAuthProvider,
     OAuthClientMetadata,
 )
 from mcpadapt.core import MCPAdapt
@@ -31,23 +29,24 @@ def main():
     # Create OAuth client metadata
     client_metadata = OAuthClientMetadata(
         client_name="MCPAdapt Canva Example",
-        redirect_uris=[HttpUrl("http://localhost:3030/callback")],
         grant_types=["authorization_code", "refresh_token"],
         response_types=["code"],
         token_endpoint_auth_method="client_secret_post",
     )
 
-    # Create OAuth handler and token storage
-    oauth_handler = LocalBrowserOAuthHandler(callback_port=3030, timeout=300)
+    # Create OAuth handler and token storage  
+    oauth_handler = LocalBrowserOAuthHandler(
+        client_metadata=client_metadata,
+        callback_port=3030, 
+        timeout=300
+    )
     token_storage = InMemoryTokenStorage()
 
-    # Create OAuth provider directly
-    oauth_provider = OAuthClientProvider(
+    # Create OAuth provider 
+    oauth_provider = OAuthProvider(
         server_url="https://mcp.canva.com",
-        client_metadata=client_metadata,
+        oauth_handler=oauth_handler,
         storage=token_storage,
-        redirect_handler=oauth_handler.handle_redirect,
-        callback_handler=oauth_handler.handle_callback,
     )
 
     # Server configuration for Canva MCP

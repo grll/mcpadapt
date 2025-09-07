@@ -17,7 +17,7 @@ from mcpadapt.auth import (
     OAuthCancellationError,
     OAuthNetworkError,
     OAuthConfigurationError,
-    OAuthClientProvider,
+    OAuthProvider,
     OAuthClientMetadata,
 )
 from mcpadapt.core import MCPAdapt
@@ -49,26 +49,27 @@ def main():
     # Create OAuth client metadata (still needed for the OAuth flow)
     client_metadata = OAuthClientMetadata(
         client_name="MCPAdapt Pre-configured OAuth Example",
-        redirect_uris=[HttpUrl(REDIRECT_URI)],
         grant_types=["authorization_code", "refresh_token"],
         response_types=["code"],
         token_endpoint_auth_method="client_secret_post",
     )
 
     # Create OAuth handler
-    oauth_handler = LocalBrowserOAuthHandler(callback_port=3030, timeout=300)
+    oauth_handler = LocalBrowserOAuthHandler(
+        client_metadata=client_metadata,
+        callback_port=3030, 
+        timeout=300
+    )
 
     # Create token storage WITH pre-configured client information
     # This is the key difference - we pass the client_info object
     token_storage = InMemoryTokenStorage(client_info=client_info)
 
     # Create OAuth provider
-    oauth_provider = OAuthClientProvider(
+    oauth_provider = OAuthProvider(
         server_url="https://api.example.com",
-        client_metadata=client_metadata,
+        oauth_handler=oauth_handler,
         storage=token_storage,  # Storage contains pre-configured credentials
-        redirect_handler=oauth_handler.handle_redirect,
-        callback_handler=oauth_handler.handle_callback,
     )
 
     # Server configuration

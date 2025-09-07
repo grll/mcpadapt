@@ -4,12 +4,12 @@ This module provides OAuth, API Key, and Bearer token authentication support
 for MCP servers.
 """
 
-from .oauth import InMemoryTokenStorage
+from .oauth import InMemoryTokenStorage, OAuthClientMetadata
 from mcp.shared.auth import (
     OAuthClientInformationFull,
     OAuthToken,
     InvalidScopeError,
-    OAuthClientMetadata,
+    OAuthClientMetadata as MCPOAuthClientMetadata,
     InvalidRedirectUriError,
     OAuthMetadata,
     ProtectedResourceMetadata,
@@ -23,6 +23,7 @@ from .handlers import (
 from .providers import (
     ApiKeyAuthProvider,
     BearerAuthProvider,
+    OAuthProvider,
     get_auth_headers,
 )
 from .exceptions import (
@@ -43,6 +44,7 @@ __all__ = [
     # Provider classes
     "ApiKeyAuthProvider",
     "BearerAuthProvider",
+    "OAuthProvider",
     # Default implementations
     "InMemoryTokenStorage",
     # Provider functions
@@ -62,8 +64,10 @@ __all__ = [
     "OAuthClientInformationFull",
     "OAuthToken",
     "InvalidScopeError",
-    "OAuthClientMetadata",
     "InvalidRedirectUriError",
     "OAuthMetadata",
     "ProtectedResourceMetadata",
+    # Our OAuth classes
+    "OAuthClientMetadata",
+    "MCPOAuthClientMetadata",
 ]

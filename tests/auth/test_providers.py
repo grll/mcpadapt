@@ -1,11 +1,30 @@
 """Tests for authentication provider classes."""
 
-from unittest.mock import Mock
+from unittest.mock import Mock, AsyncMock, patch
 from mcpadapt.auth.providers import (
     ApiKeyAuthProvider,
     BearerAuthProvider,
+    OAuthProvider,
     get_auth_headers,
 )
+from mcpadapt.auth.handlers import BaseOAuthHandler
+from mcpadapt.auth.oauth import OAuthClientMetadata
+from mcpadapt.auth import InMemoryTokenStorage
+from pydantic import AnyUrl
+from typing import List
+
+
+class MockOAuthHandler(BaseOAuthHandler):
+    """Mock OAuth handler for testing."""
+    
+    def get_redirect_uris(self) -> List[AnyUrl]:
+        return [AnyUrl("http://localhost:3030/callback")]
+    
+    async def handle_redirect(self, authorization_url: str) -> None:
+        pass
+    
+    async def handle_callback(self) -> tuple[str, str | None]:
+        return "test_code", "test_state"
 
 
 class TestApiKeyAuthProvider:
@@ -295,3 +314,102 @@ class TestProviderIntegration:
 
         # Verify original token unchanged
         assert bearer_provider.token == original_token
+
+
+class TestOAuthProvider:
+    """Test OAuthProvider class."""
+
+    def test_initialization(self):
+        """Test OAuthProvider initialization."""
+        client_metadata = OAuthClientMetadata(
+            client_name="Test App",
+            grant_types=["authorization_code", "refresh_token"],
+            response_types=["code"],
+            token_endpoint_auth_method="client_secret_post",
+        )
+        
+        oauth_handler = MockOAuthHandler(client_metadata)
+        storage = InMemoryTokenStorage()
+        
+        provider = OAuthProvider(
+            server_url="https://test-server.com",
+            oauth_handler=oauth_handler,
+            storage=storage,
+        )
+        
+        # Verify the provider was created successfully
+        assert provider is not None
+
+    def test_oauth_provider_extracts_metadata(self):
+        """Test that OAuthProvider properly extracts metadata from handler."""
+        client_metadata = OAuthClientMetadata(
+            client_name="Test App",
+            grant_types=["authorization_code", "refresh_token"],
+            response_types=["code"],
+            token_endpoint_auth_method="client_secret_post",
+        )
+        
+        oauth_handler = MockOAuthHandler(client_metadata)
+        storage = InMemoryTokenStorage()
+        
+        with patch('mcp.client.auth.OAuthClientProvider.__init__') as mock_init:
+            mock_init.return_value = None
+            
+            OAuthProvider(
+                server_url="https://test-server.com",
+                oauth_handler=oauth_handler,
+                storage=storage,
+            )
+            
+            # Verify parent constructor was called with correct parameters
+            mock_init.assert_called_once()
+            call_args = mock_init.call_args
+            
+            assert call_args[1]['server_url'] == "https://test-server.com"
+            assert call_args[1]['storage'] == storage
+            assert call_args[1]['redirect_handler'] == oauth_handler.handle_redirect
+            assert call_args[1]['callback_handler'] == oauth_handler.handle_callback
+            
+            # Verify client_metadata was properly constructed
+            client_metadata_arg = call_args[1]['client_metadata']
+            assert client_metadata_arg.client_name == "Test App"
+            assert len(client_metadata_arg.redirect_uris) == 1
+            assert str(client_metadata_arg.redirect_uris[0]) == "http://localhost:3030/callback"
+
+    def test_oauth_provider_with_custom_handler(self):
+        """Test OAuthProvider with custom handler that has different redirect URIs."""
+        
+        class CustomTestHandler(BaseOAuthHandler):
+            def get_redirect_uris(self) -> List[AnyUrl]:
+                return [AnyUrl("http://localhost:8080/auth/callback")]
+            
+            async def handle_redirect(self, authorization_url: str) -> None:
+                pass
+            
+            async def handle_callback(self) -> tuple[str, str | None]:
+                return "custom_code", "custom_state"
+        
+        client_metadata = OAuthClientMetadata(
+            client_name="Custom Test App",
+            grant_types=["authorization_code"],
+            response_types=["code"],
+            token_endpoint_auth_method="client_secret_post",
+        )
+        
+        custom_handler = CustomTestHandler(client_metadata)
+        storage = InMemoryTokenStorage()
+        
+        with patch('mcp.client.auth.OAuthClientProvider.__init__') as mock_init:
+            mock_init.return_value = None
+            
+            OAuthProvider(
+                server_url="https://custom-server.com",
+                oauth_handler=custom_handler,
+                storage=storage,
+            )
+            
+            # Verify the custom redirect URI was used
+            call_args = mock_init.call_args
+            client_metadata_arg = call_args[1]['client_metadata']
+            assert len(client_metadata_arg.redirect_uris) == 1
+            assert str(client_metadata_arg.redirect_uris[0]) == "http://localhost:8080/auth/callback"

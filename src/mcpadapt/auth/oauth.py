@@ -1,7 +1,26 @@
 """OAuth token storage and utility implementations."""
 
+from typing import List, Optional, Literal
+from pydantic import BaseModel, AnyUrl, AnyHttpUrl
 from mcp.client.auth import TokenStorage
 from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+
+
+class OAuthClientMetadata(BaseModel):
+    """OAuth client metadata without required redirect_uris.
+    
+    This is our custom version that allows handlers to manage redirect URIs internally.
+    """
+    client_name: str
+    grant_types: List[Literal["authorization_code", "refresh_token"]] = ["authorization_code", "refresh_token"]
+    response_types: List[Literal["code"]] = ["code"]
+    token_endpoint_auth_method: Literal["none", "client_secret_post"] = "client_secret_post"
+    redirect_uris: Optional[List[AnyUrl]] = None
+    scope: Optional[str] = None
+    client_uri: Optional[AnyHttpUrl] = None
+    logo_uri: Optional[AnyHttpUrl] = None
+    tos_uri: Optional[AnyHttpUrl] = None
+    policy_uri: Optional[AnyHttpUrl] = None
 
 
 class InMemoryTokenStorage(TokenStorage):

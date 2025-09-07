@@ -21,3 +21,6 @@ notebooks/
 
 # Claude files
 **/.claude/settings.local.json
+
+.coverage
+coverage.xml

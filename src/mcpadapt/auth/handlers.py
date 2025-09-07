@@ -6,7 +6,11 @@ import webbrowser
 from abc import ABC, abstractmethod
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
+from typing import List, Tuple, Optional
 
+from pydantic import AnyUrl
+from mcp.shared.auth import OAuthClientMetadata as MCPOAuthClientMetadata
+from .oauth import OAuthClientMetadata
 from .exceptions import (
     OAuthCallbackError,
     OAuthCancellationError,
@@ -178,6 +182,42 @@ class BaseOAuthHandler(ABC):
     Subclasses should implement both the redirect flow (opening authorization URL)
     and callback flow (receiving authorization code).
     """
+    
+    def __init__(self, client_metadata: OAuthClientMetadata):
+        """Initialize handler with OAuth client metadata.
+        
+        Args:
+            client_metadata: OAuth client metadata configuration
+        """
+        self.client_metadata = client_metadata
+
+    @abstractmethod
+    def get_redirect_uris(self) -> List[AnyUrl]:
+        """Get redirect URIs for this handler.
+        
+        Returns:
+            List of redirect URIs that this handler can process
+        """
+        pass
+    
+    def get_client_metadata(self) -> MCPOAuthClientMetadata:
+        """Get complete OAuth client metadata with redirect URIs populated.
+        
+        Returns:
+            Complete OAuth client metadata for MCP usage
+        """
+        return MCPOAuthClientMetadata(
+            client_name=self.client_metadata.client_name,
+            redirect_uris=self.get_redirect_uris(),
+            grant_types=self.client_metadata.grant_types,
+            response_types=self.client_metadata.response_types,
+            token_endpoint_auth_method=self.client_metadata.token_endpoint_auth_method,
+            scope=self.client_metadata.scope,
+            client_uri=self.client_metadata.client_uri,
+            logo_uri=self.client_metadata.logo_uri,
+            tos_uri=self.client_metadata.tos_uri,
+            policy_uri=self.client_metadata.policy_uri,
+        )
 
     @abstractmethod
     async def handle_redirect(self, authorization_url: str) -> None:
@@ -209,16 +249,26 @@ class LocalBrowserOAuthHandler(BaseOAuthHandler):
     approach for desktop applications.
     """
 
-    def __init__(self, callback_port: int = 3030, timeout: int = 300):
+    def __init__(self, client_metadata: OAuthClientMetadata, callback_port: int = 3030, timeout: int = 300):
         """Initialize the local browser OAuth handler.
 
         Args:
+            client_metadata: OAuth client metadata configuration
             callback_port: Port to run the local callback server on
             timeout: Maximum time to wait for OAuth callback in seconds
         """
+        super().__init__(client_metadata)
         self.callback_port = callback_port
         self.timeout = timeout
         self.callback_server: LocalCallbackServer | None = None
+    
+    def get_redirect_uris(self) -> List[AnyUrl]:
+        """Get redirect URIs for this handler.
+        
+        Returns:
+            List of redirect URIs based on callback port
+        """
+        return [AnyUrl(f"http://localhost:{self.callback_port}/callback")]
 
     async def handle_redirect(self, authorization_url: str) -> None:
         """Open authorization URL in the user's default browser.
