@@ -15,7 +15,6 @@ from mcpadapt.auth.exceptions import (
     OAuthCallbackError,
     OAuthServerError,
 )
-from pydantic import AnyUrl
 
 
 @pytest.fixture
@@ -336,7 +335,9 @@ class TestLocalBrowserOAuthHandler:
 
     def test_initialization(self, sample_client_metadata):
         """Test handler initialization."""
-        handler = LocalBrowserOAuthHandler(sample_client_metadata, callback_port=3030, timeout=300)
+        handler = LocalBrowserOAuthHandler(
+            sample_client_metadata, callback_port=3030, timeout=300
+        )
         assert handler.callback_port == 3030
         assert handler.timeout == 300
         assert handler.callback_server is None
@@ -348,7 +349,9 @@ class TestLocalBrowserOAuthHandler:
         assert handler.timeout == 300
 
     @pytest.mark.asyncio
-    async def test_handle_redirect_success(self, mock_webbrowser, sample_client_metadata):
+    async def test_handle_redirect_success(
+        self, mock_webbrowser, sample_client_metadata
+    ):
         """Test successful redirect handling."""
         mock_webbrowser.open.return_value = True
 
@@ -362,7 +365,9 @@ class TestLocalBrowserOAuthHandler:
         )
 
     @pytest.mark.asyncio
-    async def test_handle_redirect_browser_fail(self, mock_webbrowser, sample_client_metadata):
+    async def test_handle_redirect_browser_fail(
+        self, mock_webbrowser, sample_client_metadata
+    ):
         """Test redirect handling when browser fails to open."""
         mock_webbrowser.open.return_value = False
 
@@ -374,7 +379,9 @@ class TestLocalBrowserOAuthHandler:
         assert "Failed to open browser" in str(exc_info.value.original_error)
 
     @pytest.mark.asyncio
-    async def test_handle_redirect_browser_exception(self, mock_webbrowser, sample_client_metadata):
+    async def test_handle_redirect_browser_exception(
+        self, mock_webbrowser, sample_client_metadata
+    ):
         """Test redirect handling when browser raises exception."""
         mock_webbrowser.open.side_effect = Exception("Browser error")
 
@@ -388,7 +395,9 @@ class TestLocalBrowserOAuthHandler:
     @pytest.mark.asyncio
     async def test_handle_callback_success(self, sample_client_metadata):
         """Test successful callback handling."""
-        handler = LocalBrowserOAuthHandler(sample_client_metadata, callback_port=3030, timeout=300)
+        handler = LocalBrowserOAuthHandler(
+            sample_client_metadata, callback_port=3030, timeout=300
+        )
 
         # Mock LocalCallbackServer
         mock_server = Mock()
@@ -413,7 +422,9 @@ class TestLocalBrowserOAuthHandler:
     @pytest.mark.asyncio
     async def test_handle_callback_timeout(self, sample_client_metadata):
         """Test callback handling with timeout."""
-        handler = LocalBrowserOAuthHandler(sample_client_metadata, callback_port=3030, timeout=60)
+        handler = LocalBrowserOAuthHandler(
+            sample_client_metadata, callback_port=3030, timeout=60
+        )
 
         mock_server = Mock()
         mock_server.wait_for_callback.side_effect = OAuthTimeoutError(60)
@@ -507,11 +518,15 @@ class TestLocalBrowserOAuthHandlerIntegration:
     """Test integration scenarios for LocalBrowserOAuthHandler."""
 
     @pytest.mark.asyncio
-    async def test_full_oauth_flow_simulation(self, mock_webbrowser, sample_client_metadata):
+    async def test_full_oauth_flow_simulation(
+        self, mock_webbrowser, sample_client_metadata
+    ):
         """Test complete OAuth flow simulation."""
         mock_webbrowser.open.return_value = True
 
-        handler = LocalBrowserOAuthHandler(sample_client_metadata, callback_port=4040, timeout=120)
+        handler = LocalBrowserOAuthHandler(
+            sample_client_metadata, callback_port=4040, timeout=120
+        )
 
         # Mock server for callback
         mock_server = Mock()
@@ -545,12 +560,18 @@ class TestLocalBrowserOAuthHandlerIntegration:
             mock_server.stop.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_multiple_handlers_independent(self, mock_webbrowser, sample_client_metadata):
+    async def test_multiple_handlers_independent(
+        self, mock_webbrowser, sample_client_metadata
+    ):
         """Test that multiple handler instances are independent."""
         mock_webbrowser.open.return_value = True
 
-        handler1 = LocalBrowserOAuthHandler(sample_client_metadata, callback_port=3030, timeout=100)
-        handler2 = LocalBrowserOAuthHandler(sample_client_metadata, callback_port=4040, timeout=200)
+        handler1 = LocalBrowserOAuthHandler(
+            sample_client_metadata, callback_port=3030, timeout=100
+        )
+        handler2 = LocalBrowserOAuthHandler(
+            sample_client_metadata, callback_port=4040, timeout=200
+        )
 
         # Mock servers
         mock_server1 = Mock()
@@ -591,7 +612,9 @@ class TestHandlerErrorScenarios:
     """Test comprehensive error scenarios across handlers."""
 
     @pytest.mark.asyncio
-    async def test_network_failure_during_redirect(self, mock_webbrowser, sample_client_metadata):
+    async def test_network_failure_during_redirect(
+        self, mock_webbrowser, sample_client_metadata
+    ):
         """Test network failure during redirect."""
         mock_webbrowser.open.side_effect = ConnectionError("Network unreachable")
 
@@ -614,7 +637,9 @@ class TestHandlerErrorScenarios:
     @pytest.mark.asyncio
     async def test_handler_state_consistency(self, sample_client_metadata):
         """Test handler state remains consistent across operations."""
-        handler = LocalBrowserOAuthHandler(sample_client_metadata, callback_port=5050, timeout=150)
+        handler = LocalBrowserOAuthHandler(
+            sample_client_metadata, callback_port=5050, timeout=150
+        )
 
         # Verify initial state
         assert handler.callback_port == 5050

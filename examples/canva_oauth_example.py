@@ -34,15 +34,13 @@ def main():
         token_endpoint_auth_method="client_secret_post",
     )
 
-    # Create OAuth handler and token storage  
+    # Create OAuth handler and token storage
     oauth_handler = LocalBrowserOAuthHandler(
-        client_metadata=client_metadata,
-        callback_port=3030, 
-        timeout=300
+        client_metadata=client_metadata, callback_port=3030, timeout=300
     )
     token_storage = InMemoryTokenStorage()
 
-    # Create OAuth provider 
+    # Create OAuth provider
     oauth_provider = OAuthProvider(
         server_url="https://mcp.canva.com",
         oauth_handler=oauth_handler,

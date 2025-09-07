@@ -6,7 +6,7 @@ import webbrowser
 from abc import ABC, abstractmethod
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
-from typing import List, Tuple, Optional
+from typing import List
 
 from pydantic import AnyUrl
 from mcp.shared.auth import OAuthClientMetadata as MCPOAuthClientMetadata
@@ -182,10 +182,10 @@ class BaseOAuthHandler(ABC):
     Subclasses should implement both the redirect flow (opening authorization URL)
     and callback flow (receiving authorization code).
     """
-    
+
     def __init__(self, client_metadata: OAuthClientMetadata):
         """Initialize handler with OAuth client metadata.
-        
+
         Args:
             client_metadata: OAuth client metadata configuration
         """
@@ -194,15 +194,15 @@ class BaseOAuthHandler(ABC):
     @abstractmethod
     def get_redirect_uris(self) -> List[AnyUrl]:
         """Get redirect URIs for this handler.
-        
+
         Returns:
             List of redirect URIs that this handler can process
         """
         pass
-    
+
     def get_client_metadata(self) -> MCPOAuthClientMetadata:
         """Get complete OAuth client metadata with redirect URIs populated.
-        
+
         Returns:
             Complete OAuth client metadata for MCP usage
         """
@@ -249,7 +249,12 @@ class LocalBrowserOAuthHandler(BaseOAuthHandler):
     approach for desktop applications.
     """
 
-    def __init__(self, client_metadata: OAuthClientMetadata, callback_port: int = 3030, timeout: int = 300):
+    def __init__(
+        self,
+        client_metadata: OAuthClientMetadata,
+        callback_port: int = 3030,
+        timeout: int = 300,
+    ):
         """Initialize the local browser OAuth handler.
 
         Args:
@@ -261,10 +266,10 @@ class LocalBrowserOAuthHandler(BaseOAuthHandler):
         self.callback_port = callback_port
         self.timeout = timeout
         self.callback_server: LocalCallbackServer | None = None
-    
+
     def get_redirect_uris(self) -> List[AnyUrl]:
         """Get redirect URIs for this handler.
-        
+
         Returns:
             List of redirect URIs based on callback port
         """

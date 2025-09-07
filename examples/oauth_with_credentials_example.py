@@ -56,9 +56,7 @@ def main():
 
     # Create OAuth handler
     oauth_handler = LocalBrowserOAuthHandler(
-        client_metadata=client_metadata,
-        callback_port=3030, 
-        timeout=300
+        client_metadata=client_metadata, callback_port=3030, timeout=300
     )
 
     # Create token storage WITH pre-configured client information

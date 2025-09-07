@@ -8,13 +8,19 @@ from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
 
 class OAuthClientMetadata(BaseModel):
     """OAuth client metadata without required redirect_uris.
-    
+
     This is our custom version that allows handlers to manage redirect URIs internally.
     """
+
     client_name: str
-    grant_types: List[Literal["authorization_code", "refresh_token"]] = ["authorization_code", "refresh_token"]
+    grant_types: List[Literal["authorization_code", "refresh_token"]] = [
+        "authorization_code",
+        "refresh_token",
+    ]
     response_types: List[Literal["code"]] = ["code"]
-    token_endpoint_auth_method: Literal["none", "client_secret_post"] = "client_secret_post"
+    token_endpoint_auth_method: Literal["none", "client_secret_post"] = (
+        "client_secret_post"
+    )
     redirect_uris: Optional[List[AnyUrl]] = None
     scope: Optional[str] = None
     client_uri: Optional[AnyHttpUrl] = None

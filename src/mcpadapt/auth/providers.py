@@ -49,14 +49,16 @@ class BearerAuthProvider:
 
 class OAuthProvider(OAuthClientProvider):
     """OAuth provider that accepts a handler directly.
-    
+
     This class simplifies OAuth configuration by taking an OAuthHandler
     and internally extracting the client metadata and callback handlers.
     """
-    
-    def __init__(self, server_url: str, oauth_handler: BaseOAuthHandler, storage: TokenStorage):
+
+    def __init__(
+        self, server_url: str, oauth_handler: BaseOAuthHandler, storage: TokenStorage
+    ):
         """Initialize OAuth provider with handler.
-        
+
         Args:
             server_url: MCP server URL
             oauth_handler: OAuth handler containing all configuration
