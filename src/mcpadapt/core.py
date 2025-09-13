@@ -20,7 +20,7 @@ from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
 
-from .auth.providers import ApiKeyAuthProvider, BearerAuthProvider, get_auth_headers
+from .auth.providers import ApiKeyAuthProvider, BearerAuthProvider
 
 
 class ToolAdapter(ABC):
@@ -78,7 +78,7 @@ class ToolAdapter(ABC):
 async def mcptools(
     serverparams: StdioServerParameters | dict[str, Any],
     client_session_timeout_seconds: float | timedelta | None = 5,
-    auth_provider: Any = None,
+    auth_provider: OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | None = None,
 ) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]], None]:
     """Async context manager that yields tools from an MCP server.
 
@@ -108,15 +108,7 @@ async def mcptools(
 
         # Add authentication if provided
         if auth_provider is not None:
-            if isinstance(auth_provider, OAuthClientProvider):
-                client_params["auth"] = auth_provider
-            elif isinstance(auth_provider, (ApiKeyAuthProvider, BearerAuthProvider)):
-                # Add custom headers for API Key and Bearer auth
-                headers = get_auth_headers(auth_provider)
-                if "headers" in client_params:
-                    client_params["headers"].update(headers)
-                else:
-                    client_params["headers"] = headers
+            client_params["auth"] = auth_provider
 
         if transport == "sse":
             client = sse_client(**client_params)

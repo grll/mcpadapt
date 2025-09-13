@@ -152,7 +152,41 @@ class CLIHandler(BaseOAuthHandler):
         return auth_code, state
 ```
 
-## Using Custom Handlers
+## Using BearerAuthProvider with External Token Sources
+
+You can pass a function to `BearerAuthProvider` to retrieve tokens from external systems dynamically:
+
+```python
+from mcpadapt.auth import BearerAuthProvider
+from mcpadapt.core import MCPAdapt
+from mcpadapt.smolagents_adapter import SmolAgentsAdapter
+import requests
+
+def get_token_from_external_service():
+    """Retrieve authentication token from an external token service."""
+    # Example: Get token from a token management service
+    response = requests.post('https://token-service.example.com/api/token', 
+                           headers={'X-Service-Key': 'your-service-key'},
+                           json={'service': 'mcp-client'})
+    
+    if response.status_code == 200:
+        return response.json()['access_token']
+    else:
+        raise Exception(f"Failed to get token: {response.status_code}")
+
+# Create BearerAuthProvider with external token function
+bearer_auth = BearerAuthProvider(get_token_from_external_service)
+
+# Use with MCPAdapt - token will be fetched fresh on each request
+with MCPAdapt(
+    serverparams={"url": "https://api.example.com/mcp", "transport": "sse"},
+    adapter=SmolAgentsAdapter(),
+    auth_provider=bearer_auth,
+) as tools:
+    print(f"Connected with external token auth: {len(tools)} tools")
+```
+
+## Using Custom OAuth Handlers
 
 ```python
 from mcpadapt.auth import OAuthProvider, OAuthClientMetadata, InMemoryTokenStorage

@@ -1,11 +1,12 @@
 """Authentication provider classes for MCPAdapt."""
 
-from typing import Any
+from typing import Any, Callable, Generator, Union
+import httpx
 from mcp.client.auth import OAuthClientProvider, TokenStorage
 from .handlers import BaseOAuthHandler
 
 
-class ApiKeyAuthProvider:
+class ApiKeyAuthProvider(httpx.Auth):
     """Simple API key authentication provider."""
 
     def __init__(self, header_name: str, header_value: str):
@@ -18,33 +19,55 @@ class ApiKeyAuthProvider:
         self.header_name = header_name
         self.header_value = header_value
 
-    def get_headers(self) -> dict[str, str]:
-        """Get authentication headers.
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        """Execute the authentication flow by adding the API key header.
 
-        Returns:
-            Dictionary of headers to add to requests
+        Args:
+            request: The request to authenticate
+
+        Yields:
+            The authenticated request
         """
-        return {self.header_name: self.header_value}
+        request.headers[self.header_name] = self.header_value
+        yield request
 
 
-class BearerAuthProvider:
-    """Simple Bearer token authentication provider."""
 
-    def __init__(self, token: str):
+class BearerAuthProvider(httpx.Auth):
+    """Simple Bearer token authentication provider.
+    
+    Supports both static tokens (strings) and dynamic tokens (callables that return strings).
+    """
+
+    def __init__(self, token: Union[str, Callable[[], str]]):
         """Initialize with Bearer token configuration.
 
         Args:
-            token: The bearer token
+            token: The bearer token (string) or a callable that returns the token
         """
-        self.token = token
+        self._token = token
 
-    def get_headers(self) -> dict[str, str]:
-        """Get authentication headers.
-
+    def _get_token_value(self) -> str:
+        """Get the current token value.
+        
         Returns:
-            Dictionary of headers to add to requests
+            The token value, calling the token if it's callable
         """
-        return {"Authorization": f"Bearer {self.token}"}
+        return self._token() if callable(self._token) else self._token
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        """Execute the authentication flow by adding the Bearer token header.
+
+        Args:
+            request: The request to authenticate
+
+        Yields:
+            The authenticated request
+        """
+        token_value = self._get_token_value()
+        request.headers["Authorization"] = f"Bearer {token_value}"
+        yield request
+
 
 
 class OAuthProvider(OAuthClientProvider):
@@ -71,17 +94,3 @@ class OAuthProvider(OAuthClientProvider):
             redirect_handler=oauth_handler.handle_redirect,
             callback_handler=oauth_handler.handle_callback,
         )
-
-
-def get_auth_headers(auth_provider: Any) -> dict[str, str]:
-    """Get authentication headers from provider.
-
-    Args:
-        auth_provider: Authentication provider instance
-
-    Returns:
-        Dictionary of headers to add to requests
-    """
-    if isinstance(auth_provider, (ApiKeyAuthProvider, BearerAuthProvider)):
-        return auth_provider.get_headers()
-    return {}

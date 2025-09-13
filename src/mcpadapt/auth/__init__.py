@@ -24,7 +24,6 @@ from .providers import (
     ApiKeyAuthProvider,
     BearerAuthProvider,
     OAuthProvider,
-    get_auth_headers,
 )
 from .exceptions import (
     OAuthError,
@@ -47,8 +46,6 @@ __all__ = [
     "OAuthProvider",
     # Default implementations
     "InMemoryTokenStorage",
-    # Provider functions
-    "get_auth_headers",
     # Exception classes
     "OAuthError",
     "OAuthTimeoutError",

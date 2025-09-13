@@ -1,11 +1,11 @@
 """Tests for authentication provider classes."""
 
+import httpx
 from unittest.mock import Mock, patch
 from mcpadapt.auth.providers import (
     ApiKeyAuthProvider,
     BearerAuthProvider,
     OAuthProvider,
-    get_auth_headers,
 )
 from mcpadapt.auth.handlers import BaseOAuthHandler
 from mcpadapt.auth.oauth import OAuthClientMetadata
@@ -48,272 +48,248 @@ class TestApiKeyAuthProvider:
         assert provider.header_name == ""
         assert provider.header_value == ""
 
-    def test_get_headers_basic(self):
-        """Test get_headers method."""
-        provider = ApiKeyAuthProvider("X-API-Key", "test-key-123")
-        headers = provider.get_headers()
-
-        assert isinstance(headers, dict)
-        assert headers == {"X-API-Key": "test-key-123"}
-
-    def test_get_headers_different_header(self):
-        """Test get_headers with different header name."""
-        provider = ApiKeyAuthProvider("Custom-Auth", "custom-value")
-        headers = provider.get_headers()
-
-        assert isinstance(headers, dict)
-        assert headers == {"Custom-Auth": "custom-value"}
-
-    def test_get_headers_returns_new_dict(self):
-        """Test that get_headers returns a new dict instance each time."""
+    def test_httpx_auth_inheritance(self):
+        """Test that ApiKeyAuthProvider inherits from httpx.Auth."""
         provider = ApiKeyAuthProvider("X-API-Key", "test-key")
-        headers1 = provider.get_headers()
-        headers2 = provider.get_headers()
+        assert isinstance(provider, httpx.Auth)
 
-        assert headers1 == headers2
-        assert headers1 is not headers2  # Different instances
+    def test_auth_flow_basic(self):
+        """Test auth_flow method."""
+        provider = ApiKeyAuthProvider("X-API-Key", "test-key-123")
+        request = httpx.Request("GET", "https://example.com")
+        
+        auth_gen = provider.auth_flow(request)
+        authenticated_request = next(auth_gen)
+        
+        assert authenticated_request.headers["X-API-Key"] == "test-key-123"
 
-    def test_get_headers_multiple_calls(self):
-        """Test multiple calls to get_headers return consistent results."""
+    def test_auth_flow_different_header(self):
+        """Test auth_flow with different header name."""
+        provider = ApiKeyAuthProvider("Custom-Auth", "custom-value")
+        request = httpx.Request("GET", "https://example.com")
+        
+        auth_gen = provider.auth_flow(request)
+        authenticated_request = next(auth_gen)
+        
+        assert authenticated_request.headers["Custom-Auth"] == "custom-value"
+
+    def test_auth_flow_preserves_existing_headers(self):
+        """Test that auth_flow preserves existing headers."""
+        provider = ApiKeyAuthProvider("X-API-Key", "test-key")
+        request = httpx.Request("GET", "https://example.com", headers={"User-Agent": "test"})
+        
+        auth_gen = provider.auth_flow(request)
+        authenticated_request = next(auth_gen)
+        
+        assert authenticated_request.headers["X-API-Key"] == "test-key"
+        assert authenticated_request.headers["User-Agent"] == "test"
+
+    def test_auth_flow_multiple_calls(self):
+        """Test multiple calls to auth_flow return consistent results."""
         provider = ApiKeyAuthProvider("X-API-Key", "test-key")
 
         for _ in range(5):
-            headers = provider.get_headers()
-            assert headers == {"X-API-Key": "test-key"}
+            request = httpx.Request("GET", "https://example.com")
+            auth_gen = provider.auth_flow(request)
+            authenticated_request = next(auth_gen)
+            assert authenticated_request.headers["X-API-Key"] == "test-key"
+
+    def test_auth_flow_with_special_characters(self):
+        """Test auth_flow with special characters in values."""
+        provider = ApiKeyAuthProvider("X-API-Key", "key!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/~`")
+        request = httpx.Request("GET", "https://example.com")
+        
+        auth_gen = provider.auth_flow(request)
+        authenticated_request = next(auth_gen)
+        
+        assert authenticated_request.headers["X-API-Key"] == "key!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/~`"
 
 
 class TestBearerAuthProvider:
     """Test Bearer token authentication provider."""
 
-    def test_initialization(self):
-        """Test basic initialization."""
+    def test_initialization_with_string_token(self):
+        """Test basic initialization with string token."""
         provider = BearerAuthProvider("test-token-123")
-        assert provider.token == "test-token-123"
+        assert provider._token == "test-token-123"
 
-    def test_initialization_empty_token(self):
-        """Test initialization with empty token."""
-        provider = BearerAuthProvider("")
-        assert provider.token == ""
+    def test_initialization_with_callable_token(self):
+        """Test initialization with callable token."""
+        def get_token():
+            return "dynamic-token"
+        
+        provider = BearerAuthProvider(get_token)
+        assert provider._token == get_token
+        assert callable(provider._token)
 
-    def test_initialization_complex_token(self):
-        """Test initialization with complex token."""
-        complex_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
-        provider = BearerAuthProvider(complex_token)
-        assert provider.token == complex_token
+    def test_httpx_auth_inheritance(self):
+        """Test that BearerAuthProvider inherits from httpx.Auth."""
+        provider = BearerAuthProvider("test-token")
+        assert isinstance(provider, httpx.Auth)
 
-    def test_get_headers_basic(self):
-        """Test get_headers method."""
+    def test_auth_flow_with_string_token(self):
+        """Test auth_flow with string token."""
         provider = BearerAuthProvider("test-token-123")
-        headers = provider.get_headers()
+        request = httpx.Request("GET", "https://example.com")
+        
+        auth_gen = provider.auth_flow(request)
+        authenticated_request = next(auth_gen)
+        
+        assert authenticated_request.headers["Authorization"] == "Bearer test-token-123"
 
-        assert isinstance(headers, dict)
-        assert headers == {"Authorization": "Bearer test-token-123"}
+    def test_auth_flow_with_callable_token(self):
+        """Test auth_flow with callable token."""
+        call_count = 0
+        
+        def get_token():
+            nonlocal call_count
+            call_count += 1
+            return f"dynamic-token-{call_count}"
+        
+        provider = BearerAuthProvider(get_token)
+        
+        # First call
+        request1 = httpx.Request("GET", "https://example.com")
+        auth_gen1 = provider.auth_flow(request1)
+        authenticated_request1 = next(auth_gen1)
+        assert authenticated_request1.headers["Authorization"] == "Bearer dynamic-token-1"
+        
+        # Second call should get a new token
+        request2 = httpx.Request("GET", "https://example.com")
+        auth_gen2 = provider.auth_flow(request2)
+        authenticated_request2 = next(auth_gen2)
+        assert authenticated_request2.headers["Authorization"] == "Bearer dynamic-token-2"
 
-    def test_get_headers_empty_token(self):
-        """Test get_headers with empty token."""
-        provider = BearerAuthProvider("")
-        headers = provider.get_headers()
-
-        assert isinstance(headers, dict)
-        assert headers == {"Authorization": "Bearer "}
-
-    def test_get_headers_returns_new_dict(self):
-        """Test that get_headers returns a new dict instance each time."""
+    def test_auth_flow_preserves_existing_headers(self):
+        """Test that auth_flow preserves existing headers."""
         provider = BearerAuthProvider("test-token")
-        headers1 = provider.get_headers()
-        headers2 = provider.get_headers()
+        request = httpx.Request("GET", "https://example.com", headers={"User-Agent": "test"})
+        
+        auth_gen = provider.auth_flow(request)
+        authenticated_request = next(auth_gen)
+        
+        assert authenticated_request.headers["Authorization"] == "Bearer test-token"
+        assert authenticated_request.headers["User-Agent"] == "test"
 
-        assert headers1 == headers2
-        assert headers1 is not headers2  # Different instances
+    def test_get_token_value_with_string(self):
+        """Test _get_token_value with string token."""
+        provider = BearerAuthProvider("static-token")
+        assert provider._get_token_value() == "static-token"
 
-    def test_get_headers_multiple_calls(self):
-        """Test multiple calls to get_headers return consistent results."""
-        provider = BearerAuthProvider("test-token")
+    def test_get_token_value_with_callable(self):
+        """Test _get_token_value with callable token."""
+        def get_token():
+            return "callable-token"
+        
+        provider = BearerAuthProvider(get_token)
+        assert provider._get_token_value() == "callable-token"
 
-        for _ in range(5):
-            headers = provider.get_headers()
-            assert headers == {"Authorization": "Bearer test-token"}
-
-    def test_bearer_format_consistency(self):
-        """Test that Bearer format is consistent."""
-        tokens = [
-            "simple",
-            "complex.token.here",
-            "token-with-dashes",
-            "token_with_underscores",
-        ]
-
-        for token in tokens:
-            provider = BearerAuthProvider(token)
-            headers = provider.get_headers()
-            assert headers["Authorization"] == f"Bearer {token}"
-            assert headers["Authorization"].startswith("Bearer ")
-
-
-class TestGetAuthHeaders:
-    """Test get_auth_headers utility function."""
-
-    def test_with_api_key_provider(self):
-        """Test with ApiKeyAuthProvider."""
-        provider = ApiKeyAuthProvider("X-API-Key", "test-key")
-        headers = get_auth_headers(provider)
-
-        assert isinstance(headers, dict)
-        assert headers == {"X-API-Key": "test-key"}
-
-    def test_with_bearer_provider(self):
-        """Test with BearerAuthProvider."""
-        provider = BearerAuthProvider("test-token")
-        headers = get_auth_headers(provider)
-
-        assert isinstance(headers, dict)
-        assert headers == {"Authorization": "Bearer test-token"}
-
-    def test_with_unknown_provider(self):
-        """Test with unknown provider type."""
-        unknown_provider = Mock()
-        headers = get_auth_headers(unknown_provider)
-
-        assert isinstance(headers, dict)
-        assert headers == {}
-
-    def test_with_none_provider(self):
-        """Test with None provider."""
-        headers = get_auth_headers(None)
-
-        assert isinstance(headers, dict)
-        assert headers == {}
-
-    def test_with_provider_without_get_headers(self):
-        """Test with object that doesn't have get_headers method."""
-        fake_provider = object()
-        headers = get_auth_headers(fake_provider)
-
-        assert isinstance(headers, dict)
-        assert headers == {}
-
-    def test_with_string_provider(self):
-        """Test with string instead of provider object."""
-        headers = get_auth_headers("not-a-provider")
-
-        assert isinstance(headers, dict)
-        assert headers == {}
-
-    def test_with_dict_provider(self):
-        """Test with dict instead of provider object."""
-        headers = get_auth_headers({"key": "value"})
-
-        assert isinstance(headers, dict)
-        assert headers == {}
-
-    def test_multiple_provider_types(self):
-        """Test with multiple different provider types in sequence."""
-        api_key_provider = ApiKeyAuthProvider("X-API-Key", "api-key")
-        bearer_provider = BearerAuthProvider("bearer-token")
-
-        api_headers = get_auth_headers(api_key_provider)
-        bearer_headers = get_auth_headers(bearer_provider)
-        none_headers = get_auth_headers(None)
-
-        assert api_headers == {"X-API-Key": "api-key"}
-        assert bearer_headers == {"Authorization": "Bearer bearer-token"}
-        assert none_headers == {}
-
-    def test_provider_inheritance_check(self):
-        """Test that the function properly checks instance types."""
-
-        # Create a class that has get_headers but isn't a known provider
-        class FakeProvider:
-            def get_headers(self):
-                return {"Fake": "header"}
-
-        fake = FakeProvider()
-        headers = get_auth_headers(fake)
-
-        # Should return empty dict since it's not an ApiKeyAuthProvider or BearerAuthProvider
-        assert headers == {}
-
-
-class TestProviderIntegration:
-    """Test provider integration scenarios."""
-
-    def test_api_key_provider_real_world_headers(self):
-        """Test API key provider with real-world header names."""
-        test_cases = [
-            ("X-API-Key", "sk-1234567890abcdef"),
-            ("Authorization", "ApiKey sk-abcdef1234567890"),
-            ("X-RapidAPI-Key", "rapidapi-key-here"),
-            ("Ocp-Apim-Subscription-Key", "azure-key"),
-            ("x-api-key", "lowercase-header"),
-        ]
-
-        for header_name, header_value in test_cases:
-            provider = ApiKeyAuthProvider(header_name, header_value)
-            headers = provider.get_headers()
-            assert headers == {header_name: header_value}
-
-    def test_bearer_provider_real_world_tokens(self):
-        """Test Bearer provider with real-world token formats."""
+    def test_auth_flow_with_complex_tokens(self):
+        """Test auth_flow with complex token formats."""
         test_tokens = [
             "simple_token",
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.payload.signature",  # JWT-like
             "ghp_1234567890abcdef1234567890abcdef12345678",  # GitHub token-like
             "sk-1234567890abcdef1234567890abcdef1234567890abcdef1234567890",  # OpenAI-like
-            "xoxb-1234567890-1234567890-abcdefghijklmnopqrstuvwx",  # Slack-like
         ]
 
         for token in test_tokens:
             provider = BearerAuthProvider(token)
-            headers = provider.get_headers()
-            assert headers == {"Authorization": f"Bearer {token}"}
+            request = httpx.Request("GET", "https://example.com")
+            
+            auth_gen = provider.auth_flow(request)
+            authenticated_request = next(auth_gen)
+            
+            assert authenticated_request.headers["Authorization"] == f"Bearer {token}"
 
-    def test_providers_with_special_characters(self):
-        """Test providers with special characters in values."""
-        # API Key with special characters
-        api_provider = ApiKeyAuthProvider(
-            "X-API-Key", "key!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/~`"
-        )
-        api_headers = api_provider.get_headers()
-        assert "X-API-Key" in api_headers
-        assert api_headers["X-API-Key"] == "key!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/~`"
+    def test_auth_flow_with_empty_token(self):
+        """Test auth_flow with empty token."""
+        provider = BearerAuthProvider("")
+        request = httpx.Request("GET", "https://example.com")
+        
+        auth_gen = provider.auth_flow(request)
+        authenticated_request = next(auth_gen)
+        
+        assert authenticated_request.headers["Authorization"] == "Bearer "
 
-        # Bearer token with special characters
-        bearer_provider = BearerAuthProvider("token!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/~`")
-        bearer_headers = bearer_provider.get_headers()
-        assert (
-            bearer_headers["Authorization"]
-            == "Bearer token!@#$%^&*()_+-={}[]|\\:;\"'<>,.?/~`"
-        )
+    def test_callable_token_exception_handling(self):
+        """Test that exceptions in callable tokens are not caught by provider."""
+        def failing_token():
+            raise ValueError("Token generation failed")
+        
+        provider = BearerAuthProvider(failing_token)
+        request = httpx.Request("GET", "https://example.com")
+        
+        # Should raise the exception from the callable
+        try:
+            auth_gen = provider.auth_flow(request)
+            next(auth_gen)
+            assert False, "Expected ValueError to be raised"
+        except ValueError as e:
+            assert str(e) == "Token generation failed"
 
-    def test_providers_immutability(self):
-        """Test that providers don't modify their internal state."""
-        # Test API Key provider
-        api_provider = ApiKeyAuthProvider("X-API-Key", "original-key")
-        original_name = api_provider.header_name
-        original_value = api_provider.header_value
 
-        # Get headers multiple times
-        for _ in range(3):
-            headers = api_provider.get_headers()
-            headers["X-API-Key"] = "modified-key"  # Try to modify returned dict
+class TestProviderIntegration:
+    """Test provider integration scenarios."""
 
-        # Verify original values unchanged
-        assert api_provider.header_name == original_name
-        assert api_provider.header_value == original_value
+    def test_api_key_provider_with_httpx_client(self):
+        """Test that ApiKeyAuthProvider works with httpx client."""
+        provider = ApiKeyAuthProvider("X-API-Key", "test-key-123")
+        
+        # This would normally make a real request, but we're just testing the auth setup
+        client = httpx.Client(auth=provider)
+        assert client._auth is provider
 
-        # Test Bearer provider
-        bearer_provider = BearerAuthProvider("original-token")
-        original_token = bearer_provider.token
+    def test_bearer_provider_with_httpx_client(self):
+        """Test that BearerAuthProvider works with httpx client."""
+        provider = BearerAuthProvider("test-token-123")
+        
+        # This would normally make a real request, but we're just testing the auth setup
+        client = httpx.Client(auth=provider)
+        assert client._auth is provider
 
-        # Get headers multiple times
-        for _ in range(3):
-            headers = bearer_provider.get_headers()
-            headers["Authorization"] = (
-                "Bearer modified-token"  # Try to modify returned dict
-            )
+    def test_both_providers_are_httpx_auth_instances(self):
+        """Test that both providers are proper httpx.Auth instances."""
+        api_provider = ApiKeyAuthProvider("X-API-Key", "key")
+        bearer_provider = BearerAuthProvider("token")
+        
+        assert isinstance(api_provider, httpx.Auth)
+        assert isinstance(bearer_provider, httpx.Auth)
 
-        # Verify original token unchanged
-        assert bearer_provider.token == original_token
+    def test_providers_with_real_world_scenarios(self):
+        """Test providers with realistic scenarios."""
+        # API Key scenario
+        api_provider = ApiKeyAuthProvider("X-RapidAPI-Key", "your-rapidapi-key-here")
+        api_request = httpx.Request("GET", "https://api.example.com/data")
+        api_auth_gen = api_provider.auth_flow(api_request)
+        api_authenticated = next(api_auth_gen)
+        assert api_authenticated.headers["X-RapidAPI-Key"] == "your-rapidapi-key-here"
+        
+        # Bearer token scenario
+        bearer_provider = BearerAuthProvider("your-jwt-token-here")
+        bearer_request = httpx.Request("POST", "https://api.example.com/users")
+        bearer_auth_gen = bearer_provider.auth_flow(bearer_request)
+        bearer_authenticated = next(bearer_auth_gen)
+        assert bearer_authenticated.headers["Authorization"] == "Bearer your-jwt-token-here"
+
+    def test_callable_token_refresh_scenario(self):
+        """Test callable token for token refresh scenarios."""
+        refresh_count = 0
+        
+        def refresh_token():
+            nonlocal refresh_count
+            refresh_count += 1
+            return f"refreshed-token-{refresh_count}"
+        
+        provider = BearerAuthProvider(refresh_token)
+        
+        # Simulate multiple API calls that would refresh the token
+        for i in range(3):
+            request = httpx.Request("GET", "https://api.example.com")
+            auth_gen = provider.auth_flow(request)
+            authenticated_request = next(auth_gen)
+            expected_token = f"refreshed-token-{i + 1}"
+            assert authenticated_request.headers["Authorization"] == f"Bearer {expected_token}"
 
 
 class TestOAuthProvider:
