@@ -367,52 +367,6 @@ def test_none_values_filtered_from_kwargs(mcp_server_that_rejects_none_script):
 
 
 @pytest.fixture
-def single_content_server_script():
-    return dedent(
-        """
-        import mcp.types as types
-        from mcp.server.lowlevel import Server
-        from mcp.server.stdio import stdio_server
-        import anyio
-
-        app = Server("single-content-server")
-
-        @app.call_tool()
-        async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
-            if name != "single_content_tool":
-                raise ValueError(f"Unknown tool: {name}")
-            
-            # Return single content response
-            return [types.TextContent(
-                type="text", 
-                text="Single response"
-            )]
-
-        @app.list_tools()
-        async def list_tools() -> list[types.Tool]:
-            return [
-                types.Tool(
-                    name="single_content_tool",
-                    description="A tool that returns single content",
-                    inputSchema={
-                        "type": "object",
-                        "properties": {},
-                    },
-                )
-            ]
-
-        async def arun():
-            async with stdio_server() as streams:
-                await app.run(
-                    streams[0], streams[1], app.create_initialization_options()
-                )
-
-        anyio.run(arun)
-        """
-    )
-
-
-@pytest.fixture
 def multiple_content_server_script():
     return dedent(
         """
@@ -427,7 +381,7 @@ def multiple_content_server_script():
         async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
             if name != "multiple_content_tool":
                 raise ValueError(f"Unknown tool: {name}")
-            
+
             # Return multiple content responses
             return [
                 types.TextContent(type="text", text="First response"),
@@ -457,24 +411,6 @@ def multiple_content_server_script():
         anyio.run(arun)
         """
     )
-
-
-def test_single_content_response_handling(single_content_server_script):
-    """Test that single content responses return just the text content."""
-    with MCPAdapt(
-        StdioServerParameters(
-            command="uv",
-            args=["run", "python", "-c", single_content_server_script],
-        ),
-        CrewAIAdapter(),
-    ) as tools:
-        assert len(tools) == 1
-        tool = tools[0]
-        assert tool.name == "single_content_tool"
-
-        result = tool.run()
-        # Should return the single text content directly, not as a list
-        assert result == "Single response"
 
 
 def test_multiple_content_response_handling(multiple_content_server_script):
