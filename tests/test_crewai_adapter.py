@@ -364,3 +364,69 @@ def test_none_values_filtered_from_kwargs(mcp_server_that_rejects_none_script):
         assert "Another: None" in result
         # Most importantly, no error message about "is not of type string, is <nil>"
         assert "parameter" not in result or "is <nil>" not in result
+
+
+@pytest.fixture
+def multiple_content_server_script():
+    return dedent(
+        """
+        import mcp.types as types
+        from mcp.server.lowlevel import Server
+        from mcp.server.stdio import stdio_server
+        import anyio
+
+        app = Server("multiple-content-server")
+
+        @app.call_tool()
+        async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+            if name != "multiple_content_tool":
+                raise ValueError(f"Unknown tool: {name}")
+
+            # Return multiple content responses
+            return [
+                types.TextContent(type="text", text="First response"),
+                types.TextContent(type="text", text="Second response"),
+                types.TextContent(type="text", text="Third response")
+            ]
+
+        @app.list_tools()
+        async def list_tools() -> list[types.Tool]:
+            return [
+                types.Tool(
+                    name="multiple_content_tool",
+                    description="A tool that returns multiple content items",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                    },
+                )
+            ]
+
+        async def arun():
+            async with stdio_server() as streams:
+                await app.run(
+                    streams[0], streams[1], app.create_initialization_options()
+                )
+
+        anyio.run(arun)
+        """
+    )
+
+
+def test_multiple_content_response_handling(multiple_content_server_script):
+    """Test that multiple content responses return a string representation of the list."""
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv",
+            args=["run", "python", "-c", multiple_content_server_script],
+        ),
+        CrewAIAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        tool = tools[0]
+        assert tool.name == "multiple_content_tool"
+
+        result = tool.run()
+        # Should return string representation of list of text contents
+        expected = str(["First response", "Second response", "Third response"])
+        assert result == expected
