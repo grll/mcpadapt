@@ -132,7 +132,12 @@ def create_model_from_json_schema(
 
                     types.append(created_models[ref_name])
 
-            field_type = types[0] if len(types) == 1 else Union[tuple(types)]  # type: ignore
+            if len(types) == 0:
+                field_type = Any
+            elif len(types) == 1:
+                field_type = types[0]
+            else:
+                field_type = Union[tuple(types)]  # type: ignore
             default = field_schema.get("default")
             is_required = field_name in required and default is None
 
@@ -158,10 +163,12 @@ def create_model_from_json_schema(
                         mapped_type = json_type_mapping.get(t, Any)
                         types.append(mapped_type)
 
-                if len(types) > 1:
-                    field_type = Union[tuple(types)]  # type: ignore
+                if len(types) == 0:
+                    field_type = Any
+                elif len(types) == 1:
+                    field_type = types[0]
                 else:
-                    field_type = types[0] if types else Any
+                    field_type = Union[tuple(types)]  # type: ignore
             else:
                 # Original code for simple types
                 field_type = json_type_mapping.get(json_type, Any)  # type: ignore

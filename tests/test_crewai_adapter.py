@@ -482,9 +482,9 @@ def empty_union_server_script():
 
 
 def test_empty_union_type_error(empty_union_server_script):
-    """Test that empty unions (anyOf with only null types) raise TypeError.
+    """Test that empty unions (anyOf with only null types) do not raise TypeError.
 
-    This test reproduces issue #71 where schemas with anyOf containing only
+    This test reproduced issue #71 where schemas with anyOf containing only
     null types cause 'Cannot take a Union of no types' error.
     """
     with MCPAdapt(
@@ -494,5 +494,4 @@ def test_empty_union_type_error(empty_union_server_script):
         ),
         CrewAIAdapter(),
     ) as tools:
-        # Should raise TypeError before reaching here
-        pass
+        assert len(tools) == 1
