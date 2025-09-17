@@ -28,6 +28,13 @@ theme:
 nav:
   - Intro: index.md
   - Quickstart: quickstart.md
+  - Authentication:
+    - Overview: auth/overview.md
+    - Quick Start: auth/quickstart.md
+    - OAuth 2.0: auth/oauth.md
+    - API Key: auth/api-key.md
+    - Bearer Token: auth/bearer-token.md
+    - Custom Handlers: auth/custom-handlers.md
   - Guided Examples: 
     - guide/smolagents.md
     - guide/crewai.md

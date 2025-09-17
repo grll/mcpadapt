@@ -15,9 +15,12 @@ from typing import Any, AsyncGenerator, Callable, Coroutine
 
 import mcp
 from mcp import ClientSession, StdioServerParameters
+from mcp.client.auth import OAuthClientProvider
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
+
+from .auth.providers import ApiKeyAuthProvider, BearerAuthProvider
 
 
 class ToolAdapter(ABC):
@@ -75,6 +78,7 @@ class ToolAdapter(ABC):
 async def mcptools(
     serverparams: StdioServerParameters | dict[str, Any],
     client_session_timeout_seconds: float | timedelta | None = 5,
+    auth_provider: OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | None = None,
 ) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]], None]:
     """Async context manager that yields tools from an MCP server.
 
@@ -86,6 +90,7 @@ async def mcptools(
             * if StdioServerParameters, run the MCP server using the stdio protocol.
             * if dict, assume the dict corresponds to parameters to an sse MCP server.
         client_session_timeout_seconds: Timeout for MCP ClientSession calls
+        auth_provider: Optional authentication provider for securing connections
 
     Yields:
         A tuple of (MCP Client Session, list of MCP tools) available on the MCP server.
@@ -100,6 +105,11 @@ async def mcptools(
         # Create a deep copy to avoid modifying the original dict
         client_params = copy.deepcopy(serverparams)
         transport = client_params.pop("transport", "sse")
+
+        # Add authentication if provided
+        if auth_provider is not None:
+            client_params["auth"] = auth_provider
+
         if transport == "sse":
             client = sse_client(**client_params)
         elif transport == "streamable-http":
@@ -180,6 +190,11 @@ class MCPAdapt:
         adapter: ToolAdapter,
         connect_timeout: int = 30,
         client_session_timeout_seconds: float | timedelta | None = 5,
+        auth_provider: OAuthClientProvider
+        | ApiKeyAuthProvider
+        | BearerAuthProvider
+        | list[OAuthClientProvider | ApiKeyAuthProvider | BearerAuthProvider | None]
+        | None = None,
     ):
         """
         Manage the MCP server / client lifecycle and expose tools adapted with the adapter.
@@ -190,6 +205,8 @@ class MCPAdapt:
             adapter (ToolAdapter): Adapter to use to convert MCP tools call into agentic framework tools.
             connect_timeout (int): Connection timeout in seconds to the mcp server (default is 30s).
             client_session_timeout_seconds: Timeout for MCP ClientSession calls
+            auth_provider: Optional authentication provider. Can be a single provider for all servers,
+                        a list matching serverparams length, or None for no authentication.
 
         Raises:
             TimeoutError: When the connection to the mcp server time out.
@@ -201,6 +218,19 @@ class MCPAdapt:
             self.serverparams = [serverparams]
 
         self.adapter = adapter
+
+        # Handle auth_provider - ensure it matches serverparams length
+        if auth_provider is None:
+            self.auth_providers = [None] * len(self.serverparams)
+        elif isinstance(auth_provider, list):
+            if len(auth_provider) != len(self.serverparams):
+                raise ValueError(
+                    f"auth_provider list length ({len(auth_provider)}) must match serverparams length ({len(self.serverparams)})"
+                )
+            self.auth_providers = auth_provider
+        else:
+            # Single auth provider for all servers
+            self.auth_providers = [auth_provider] * len(self.serverparams)
 
         # session and tools get set by the async loop during initialization.
         self.sessions: list[ClientSession] = []
@@ -224,9 +254,13 @@ class MCPAdapt:
             async with AsyncExitStack() as stack:
                 connections = [
                     await stack.enter_async_context(
-                        mcptools(params, self.client_session_timeout_seconds)
+                        mcptools(
+                            params, self.client_session_timeout_seconds, auth_provider
+                        )
                     )
-                    for params in self.serverparams
+                    for params, auth_provider in zip(
+                        self.serverparams, self.auth_providers
+                    )
                 ]
                 self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
                 self.ready.set()  # Signal initialization is complete
@@ -332,9 +366,9 @@ class MCPAdapt:
 
         connections = [
             await self._ctxmanager.enter_async_context(
-                mcptools(params, self.client_session_timeout_seconds)
+                mcptools(params, self.client_session_timeout_seconds, auth_provider)
             )
-            for params in self.serverparams
+            for params, auth_provider in zip(self.serverparams, self.auth_providers)
         ]
 
         self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
