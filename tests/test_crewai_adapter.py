@@ -430,3 +430,68 @@ def test_multiple_content_response_handling(multiple_content_server_script):
         # Should return string representation of list of text contents
         expected = str(["First response", "Second response", "Third response"])
         assert result == expected
+
+
+@pytest.fixture
+def empty_union_server_script():
+    """Server that returns a tool with a schema containing only null types in anyOf."""
+    return dedent(
+        """
+        import mcp.types as types
+        from mcp.server.lowlevel import Server
+        from mcp.server.stdio import stdio_server
+        import anyio
+
+        app = Server("empty-union-server")
+
+        @app.list_tools()
+        async def list_tools() -> list[types.Tool]:
+            return [
+                types.Tool(
+                    name="problematic_tool",
+                    description="Tool with empty union after null filtering",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "nullable_only": {
+                                "anyOf": [
+                                    {"type": "null"}
+                                ]
+                            },
+                            "type_array_null_only": {
+                                "type": ["null"]
+                            }
+                        },
+                    },
+                )
+            ]
+
+        @app.call_tool()
+        async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+            return [types.TextContent(type="text", text="Success")]
+
+        async def arun():
+            async with stdio_server() as streams:
+                await app.run(
+                    streams[0], streams[1], app.create_initialization_options()
+                )
+
+        anyio.run(arun)
+        """
+    )
+
+
+def test_empty_union_type_error(empty_union_server_script):
+    """Test that empty unions (anyOf with only null types) do not raise TypeError.
+
+    This test reproduced issue #71 where schemas with anyOf containing only
+    null types cause 'Cannot take a Union of no types' error.
+    """
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv",
+            args=["run", "python", "-c", empty_union_server_script],
+        ),
+        CrewAIAdapter(),
+    ) as tools:
+        assert len(tools) == 1
