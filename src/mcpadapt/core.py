@@ -18,6 +18,14 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.websocket import websocket_client
+
+
+TRANSPORTS = {
+    "sse": sse_client,
+    "streamable-http": streamablehttp_client,
+    "ws": websocket_client,
+}
 
 
 class ToolAdapter(ABC):
@@ -100,14 +108,13 @@ async def mcptools(
         # Create a deep copy to avoid modifying the original dict
         client_params = copy.deepcopy(serverparams)
         transport = client_params.pop("transport", "sse")
-        if transport == "sse":
-            client = sse_client(**client_params)
-        elif transport == "streamable-http":
-            client = streamablehttp_client(**client_params)
+        if transport in TRANSPORTS:
+            client = TRANSPORTS[transport](**client_params)
         else:
             raise ValueError(
-                f"Invalid transport, expected sse or streamable-http found `{transport}`"
+                f"Invalid transport, expected {list(TRANSPORTS.keys())} found `{transport}`"
             )
+
     else:
         raise ValueError(
             f"Invalid serverparams, expected StdioServerParameters or dict found `{type(serverparams)}`"
