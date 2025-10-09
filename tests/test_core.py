@@ -154,6 +154,131 @@ async def echo_streamable_http_server(echo_server_streamable_http_script):
 
 
 @pytest.fixture
+def echo_server_websocket_script():
+    return dedent(
+        '''
+        import asyncio
+        import json
+        import websockets
+
+        async def handle_mcp_client(websocket):
+            """Handle MCP protocol over websocket"""
+            try:
+                async for message in websocket:
+                    data = json.loads(message)
+                    
+                    if data.get("method") == "initialize":
+                        # Send initialize response
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": data.get("id"),
+                            "result": {
+                                "protocolVersion": "2024-11-05",
+                                "capabilities": {
+                                    "tools": {}
+                                },
+                                "serverInfo": {
+                                    "name": "Echo Server",
+                                    "version": "1.0.0"
+                                }
+                            }
+                        }
+                        await websocket.send(json.dumps(response))
+                    
+                    elif data.get("method") == "tools/list":
+                        # Send tools list response
+                        response = {
+                            "jsonrpc": "2.0",
+                            "id": data.get("id"),
+                            "result": {
+                                "tools": [{
+                                    "name": "echo_tool",
+                                    "description": "Echo the input text",
+                                    "inputSchema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "text": {"type": "string"}
+                                        },
+                                        "required": ["text"]
+                                    }
+                                }]
+                            }
+                        }
+                        await websocket.send(json.dumps(response))
+                    
+                    elif data.get("method") == "tools/call":
+                        # Handle tool call
+                        tool_name = data.get("params", {}).get("name")
+                        arguments = data.get("params", {}).get("arguments", {})
+                        
+                        if tool_name == "echo_tool":
+                            text = arguments.get("text", "")
+                            response = {
+                                "jsonrpc": "2.0",
+                                "id": data.get("id"),
+                                "result": {
+                                    "content": [{
+                                        "type": "text",
+                                        "text": f"Echo: {text}"
+                                    }]
+                                }
+                            }
+                            await websocket.send(json.dumps(response))
+                        
+            except websockets.exceptions.ConnectionClosed:
+                pass
+            
+        async def main():
+            server = await websockets.serve(handle_mcp_client, "127.0.0.1", 8001)
+            await server.wait_closed()
+        
+        if __name__ == "__main__":
+            asyncio.run(main())
+        '''
+    )
+
+
+@pytest.fixture
+def echo_websocket_server(echo_server_websocket_script):
+    import subprocess
+
+    # Start the WebSocket server process
+    process = subprocess.Popen(
+        ["python", "-c", echo_server_websocket_script],
+    )
+
+    # Give the server a moment to start up
+    time.sleep(1)
+
+    try:
+        yield {"url": "ws://127.0.0.1:8001/ws", "transport": "ws"}
+    finally:
+        # Clean up the process when test is done
+        process.kill()
+        process.wait()
+
+
+@pytest.fixture
+async def echo_websocket_server_async(echo_server_websocket_script):
+    import subprocess
+
+    # Start the WebSocket server process
+    process = subprocess.Popen(
+        ["python", "-c", echo_server_websocket_script],
+    )
+
+    # Give the server a moment to start up
+    time.sleep(1)
+
+    try:
+        yield {"url": "ws://127.0.0.1:8001/ws", "transport": "ws"}
+    finally:
+        # Clean up the process when test is done
+        process.kill()
+        process.wait()
+
+
+@pytest.fixture
 def slow_start_server_script():
     return dedent(
         '''
@@ -341,6 +466,51 @@ async def test_basic_async_streamable_http(echo_streamable_http_server):
     ) as tools:
         assert len(tools) == 1
         assert (await tools[0]({"text": "hello"})).content[0].text == "Echo: hello"
+
+
+def test_basic_sync_websocket(echo_websocket_server):
+    ws_serverparams = echo_websocket_server
+    with MCPAdapt(
+        ws_serverparams,
+        DummyAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
+
+
+def test_basic_sync_multiple_websocket(echo_websocket_server):
+    ws_serverparams = echo_websocket_server
+    with MCPAdapt(
+        [ws_serverparams, ws_serverparams],
+        DummyAdapter(),
+    ) as tools:
+        assert len(tools) == 2
+        assert tools[0]({"text": "hello"}).content[0].text == "Echo: hello"
+        assert tools[1]({"text": "world"}).content[0].text == "Echo: world"
+
+
+async def test_basic_async_websocket(echo_websocket_server):
+    ws_serverparams = echo_websocket_server
+    async with MCPAdapt(
+        ws_serverparams,
+        DummyAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        mcp_tool_call_result = await tools[0]({"text": "hello"})
+        assert mcp_tool_call_result.content[0].text == "Echo: hello"
+
+
+async def test_basic_async_multiple_websocket(echo_websocket_server):
+    ws_serverparams = echo_websocket_server
+    async with MCPAdapt(
+        [ws_serverparams, ws_serverparams],
+        DummyAdapter(),
+    ) as tools:
+        assert len(tools) == 2
+        mcp_tool_call_result = await tools[0]({"text": "hello"})
+        assert mcp_tool_call_result.content[0].text == "Echo: hello"
+        mcp_tool_call_result = await tools[1]({"text": "world"})
+        assert mcp_tool_call_result.content[0].text == "Echo: world"
 
 
 def test_connect_timeout(slow_start_server_script):

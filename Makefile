@@ -17,7 +17,7 @@ mypy:
 
 .PHONY: tests
 tests: 
-	uv run pytest 
+	uv run --extra test pytest
 
 .PHONY: coverage
 coverage:
