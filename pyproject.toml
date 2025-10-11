@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Guillaume Raille", email = "guillaume.raille@gmail.com" }]
 dependencies = [
-    "mcp>=1.10.1",
+    "mcp[ws]>=1.10.1",
     "jsonref>=1.1.0",
     "python-dotenv>=1.0.1",
     "pydantic>=2.10.6",
