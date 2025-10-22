@@ -187,7 +187,7 @@ class MCPAdapt:
         adapter: ToolAdapter,
         connect_timeout: int = 30,
         client_session_timeout_seconds: float | timedelta | None = 5,
-        fail_fast: bool = False,
+        fail_fast: bool = True,
         on_connection_error: Callable[[Any, Exception], None] | None = None,
     ):
         """
@@ -201,7 +201,7 @@ class MCPAdapt:
             client_session_timeout_seconds: Timeout for MCP ClientSession calls
             fail_fast (bool): If True, any connection failure will cause the entire adapter to fail.
                             If False, failed connections are skipped and only successful connections are used.
-                            Default is False for better fault tolerance.
+                            Default is True to maintain backward compatibility.
             on_connection_error: Optional callback function called when a connection fails.
                                Receives (server_params, exception) as arguments.
 
