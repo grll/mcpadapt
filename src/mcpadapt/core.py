@@ -252,7 +252,6 @@ class MCPAdapt:
                         connections.append(connection)
                     except Exception as e:
                         self.failed_connections.append((params, e))
-                        error_msg = f"Failed to connect to MCP server {params}: {e}"
 
                         if self.on_connection_error:
                             self.on_connection_error(params, e)
@@ -331,10 +330,8 @@ class MCPAdapt:
         # check connection to mcp server is ready
         if not self.ready.wait(timeout=self.connect_timeout):
             raise TimeoutError(
-                f"Couldn't initialize MCP connections after {self.connect_timeout} seconds"
+                f"Couldn't connect to the MCP server after {self.connect_timeout} seconds"
             )
-
-        pass
 
     def close(self):
         """Clean up resources and stop the client."""
