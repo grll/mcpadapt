@@ -114,7 +114,11 @@ class SmolAgentsAdapter(ToolAdapter):
             and mcp_tool.outputSchema
         ):
             try:
-                output_schema = jsonref.replace_refs(mcp_tool.outputSchema)
+                output_schema = {
+                    k: v
+                    for k, v in jsonref.replace_refs(mcp_tool.outputSchema).items()
+                    if k != "$defs"
+                }
             except Exception as e:
                 logger.warning(
                     f"Failed to resolve outputSchema for tool {mcp_tool.name}: {e}"
