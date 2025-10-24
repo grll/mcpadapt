@@ -234,7 +234,7 @@ def test_audio_tool(shared_datadir):
         pytest.skip(
             "TorchCodec not installed; install torchcodec to run test_audio_tool. (uv add mcpadapt[audio])"
         )
-    except RuntimeError as e:
+    except RuntimeError:
         pytest.skip(
             "Couldn't load AudioDecoder from torchcodec. Likely because of runtime depedency (ffmpeg not installed or incompatible torch version)"
         )
