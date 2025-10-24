@@ -187,6 +187,8 @@ class MCPAdapt:
         adapter: ToolAdapter,
         connect_timeout: int = 30,
         client_session_timeout_seconds: float | timedelta | None = 5,
+        fail_fast: bool = True,
+        on_connection_error: Callable[[Any, Exception], None] | None = None,
     ):
         """
         Manage the MCP server / client lifecycle and expose tools adapted with the adapter.
@@ -197,9 +199,14 @@ class MCPAdapt:
             adapter (ToolAdapter): Adapter to use to convert MCP tools call into agentic framework tools.
             connect_timeout (int): Connection timeout in seconds to the mcp server (default is 30s).
             client_session_timeout_seconds: Timeout for MCP ClientSession calls
+            fail_fast (bool): If True, any connection failure will cause the entire adapter to fail.
+                            If False, failed connections are skipped and only successful connections are used.
+                            Default is True to maintain backward compatibility.
+            on_connection_error: Optional callback function called when a connection fails.
+                               Receives (server_params, exception) as arguments.
 
         Raises:
-            TimeoutError: When the connection to the mcp server time out.
+            TimeoutError: When the connection to the mcp server time out and fail_fast=True.
         """
 
         if isinstance(serverparams, list):
@@ -208,6 +215,11 @@ class MCPAdapt:
             self.serverparams = [serverparams]
 
         self.adapter = adapter
+        self.fail_fast = fail_fast
+        self.on_connection_error = on_connection_error
+
+        # Track failed connections for transparency
+        self.failed_connections: list[tuple[Any, Exception]] = []
 
         # session and tools get set by the async loop during initialization.
         self.sessions: list[ClientSession] = []
@@ -229,13 +241,31 @@ class MCPAdapt:
 
         async def setup():
             async with AsyncExitStack() as stack:
-                connections = [
-                    await stack.enter_async_context(
-                        mcptools(params, self.client_session_timeout_seconds)
-                    )
-                    for params in self.serverparams
-                ]
-                self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
+                connections = []
+
+                # Try to connect to each server individually for better fault tolerance
+                for params in self.serverparams:
+                    try:
+                        connection = await stack.enter_async_context(
+                            mcptools(params, self.client_session_timeout_seconds)
+                        )
+                        connections.append(connection)
+                    except Exception as e:
+                        self.failed_connections.append((params, e))
+
+                        if self.on_connection_error:
+                            self.on_connection_error(params, e)
+
+                        if self.fail_fast:
+                            raise
+                        else:
+                            pass
+
+                if not connections and not self.fail_fast:
+                    self.sessions, self.mcp_tools = [], []
+                elif connections:
+                    self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
+
                 self.ready.set()  # Signal initialization is complete
                 await asyncio.Event().wait()  # Keep session alive until stopped
 
@@ -257,8 +287,12 @@ class MCPAdapt:
         see :meth:`atools`.
 
         """
-        if not self.sessions:
+        if not self.sessions and not self.failed_connections:
             raise RuntimeError("Session not initialized")
+
+        if not self.sessions:
+            # Only failed connections, no successful ones
+            return []
 
         def _sync_call_tool(
             session, name: str, arguments: dict | None = None
@@ -337,14 +371,30 @@ class MCPAdapt:
     async def __aenter__(self) -> list[Any]:
         self._ctxmanager = AsyncExitStack()
 
-        connections = [
-            await self._ctxmanager.enter_async_context(
-                mcptools(params, self.client_session_timeout_seconds)
-            )
-            for params in self.serverparams
-        ]
+        connections = []
 
-        self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
+        # Try to connect to each server individually for better fault tolerance
+        for params in self.serverparams:
+            try:
+                connection = await self._ctxmanager.enter_async_context(
+                    mcptools(params, self.client_session_timeout_seconds)
+                )
+                connections.append(connection)
+            except Exception as e:
+                self.failed_connections.append((params, e))
+
+                if self.on_connection_error:
+                    self.on_connection_error(params, e)
+
+                if self.fail_fast:
+                    raise
+                else:
+                    pass
+
+        if not connections and not self.fail_fast:
+            self.sessions, self.mcp_tools = [], []
+        elif connections:
+            self.sessions, self.mcp_tools = [list(c) for c in zip(*connections)]
 
         return await self.atools()
 
