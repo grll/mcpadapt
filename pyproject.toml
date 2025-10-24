@@ -3,7 +3,7 @@ name = "mcpadapt"
 dynamic = ["version"]
 description = "Adapt MCP servers to many agentic framework."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "MIT"
 authors = [{ name = "Guillaume Raille", email = "guillaume.raille@gmail.com" }]
 dependencies = [
@@ -16,8 +16,6 @@ classifiers = [
     "Typing :: Typed",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Intended Audience :: Developers",
     "Operating System :: OS Independent",
@@ -60,6 +58,7 @@ google-genai = [
 audio = [
     "torchaudio>=2.7.1",
     "soundfile>=0.13.1",
+    "torchcodec>=0.8.0",
 ]
 
 [tool.hatch.version]

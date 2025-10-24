@@ -228,6 +228,17 @@ def test_image_tool(shared_datadir):
 
 
 def test_audio_tool(shared_datadir):
+    try:
+        from torchcodec.decoders import AudioDecoder  # noqa: F401
+    except ImportError:
+        pytest.skip(
+            "TorchCodec not installed; install torchcodec to run test_audio_tool. (uv add mcpadapt[audio])"
+        )
+    except RuntimeError as e:
+        pytest.skip(
+            "Couldn't load AudioDecoder from torchcodec. Likely because of runtime depedency (ffmpeg not installed or incompatible torch version)"
+        )
+
     mcp_server_script = dedent(
         f"""
         import os
