@@ -7,6 +7,7 @@ import pytest
 from mcp import StdioServerParameters
 
 from mcpadapt.core import MCPAdapt, ToolAdapter
+from tests._server_utils import launch_mcp_server, terminate_mcp_server
 
 
 class DummyAdapter(ToolAdapter):
@@ -81,9 +82,12 @@ def update_server_script():
 def echo_server_sse_script():
     return dedent(
         '''
+        import os
         from mcp.server.fastmcp import FastMCP
 
-        mcp = FastMCP("Echo Server", host="127.0.0.1", port=8000)
+        port = int(os.environ.get("MCP_TEST_PORT", "8000"))
+
+        mcp = FastMCP("Echo Server", host="127.0.0.1", port=port)
 
         @mcp.tool()
         def echo_tool(text: str) -> str:
@@ -97,31 +101,27 @@ def echo_server_sse_script():
 
 @pytest.fixture
 async def echo_sse_server(echo_server_sse_script):
-    import subprocess
-
-    # Start the SSE server process with its own process group
-    process = subprocess.Popen(
-        ["python", "-c", echo_server_sse_script],
-    )
-
-    # Give the server a moment to start up
-    time.sleep(1)
+    try:
+        process, port = launch_mcp_server(echo_server_sse_script)
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
 
     try:
-        yield {"url": "http://127.0.0.1:8000/sse"}
+        yield {"url": f"http://127.0.0.1:{port}/sse"}
     finally:
-        # Clean up the process when test is done
-        process.kill()
-        process.wait()
+        terminate_mcp_server(process)
 
 
 @pytest.fixture
 def echo_server_streamable_http_script():
     return dedent(
         '''
+        import os
         from mcp.server.fastmcp import FastMCP
         
-        mcp = FastMCP("Echo Server", host="127.0.0.1", port=8000, stateless_http=True, json_response=True)
+        port = int(os.environ.get("MCP_TEST_PORT", "8000"))
+
+        mcp = FastMCP("Echo Server", host="127.0.0.1", port=port, stateless_http=True, json_response=True)
         
         @mcp.tool()
         def echo_tool(text: str) -> str:
@@ -135,22 +135,15 @@ def echo_server_streamable_http_script():
 
 @pytest.fixture
 async def echo_streamable_http_server(echo_server_streamable_http_script):
-    import subprocess
-
-    # Start the SSE server process with its own process group
-    process = subprocess.Popen(
-        ["python", "-c", echo_server_streamable_http_script],
-    )
-
-    # Give the server a moment to start up
-    time.sleep(1)
+    try:
+        process, port = launch_mcp_server(echo_server_streamable_http_script)
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
 
     try:
-        yield {"url": "http://127.0.0.1:8000/mcp", "transport": "streamable-http"}
+        yield {"url": f"http://127.0.0.1:{port}/mcp", "transport": "streamable-http"}
     finally:
-        # Clean up the process when test is done
-        process.kill()
-        process.wait()
+        terminate_mcp_server(process)
 
 
 @pytest.fixture
