@@ -1,6 +1,6 @@
+import logging
 from pathlib import Path
 from textwrap import dedent
-import logging
 
 import pytest
 from mcp import StdioServerParameters
