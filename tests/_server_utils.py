@@ -44,6 +44,20 @@ def launch_mcp_server(script: str) -> Tuple[subprocess.Popen[str], int]:
             f"Exit code: {process.returncode}\nStdout:\n{stdout}\nStderr:\n{stderr}"
         )
 
+    for attempt in range(3):
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                break
+        except OSError as exc:
+            if attempt == 2:
+                stdout, stderr = terminate_mcp_server(process)
+                raise RuntimeError(
+                    "MCP server subprocess is not accepting connections. "
+                    f"Attempted to connect to 127.0.0.1:{port} but received: {exc}\n"
+                    f"Stdout:\n{stdout}\nStderr:\n{stderr}"
+                ) from exc
+            time.sleep(0.2)
+
     return process, port
 
 
