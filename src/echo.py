@@ -10,16 +10,20 @@ mcp = FastMCP("Echo Server")
 
 
 @mcp.tool()
-def echo_tool(text: str = Field(description="The text to echo")) -> str:
+def echo_tool(
+    id: int | float | None,
+    text: str = Field(description="The text to echo"),
+) -> str:
     """Echo the input text
 
     Args:
+        id (int|float|None): (Optional) Id
         text (str): The text to echo
 
     Returns:
         str: The echoed text
     """
-    return text
+    return f"echo_tool({id},{text})"
 
 
 @mcp.resource("echo://static")
