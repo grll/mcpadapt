@@ -64,16 +64,15 @@ def create_model_from_json_schema(
 
         for field_name, field_schema in properties.items():
             field_type, default = get_field_type(field_name, field_schema, required)
+
+            # Only pass standard Field parameters to avoid extra schema properties
+            # that cause OpenAI API validation errors (items, anyOf, enum, properties
+            # as None values are rejected by OpenAI's strict schema validation)
             fields[field_name] = (
                 field_type,
                 Field(
                     default=default,
                     description=field_schema.get("description", ""),
-                    title=field_schema.get("title", ""),
-                    items=field_schema.get("items", None),
-                    anyOf=field_schema.get("anyOf", []),
-                    enum=field_schema.get("enum", None),
-                    properties=field_schema.get("properties", {}),
                 ),
             )
 
