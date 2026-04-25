@@ -64,17 +64,21 @@ def create_model_from_json_schema(
 
         for field_name, field_schema in properties.items():
             field_type, default = get_field_type(field_name, field_schema, required)
+            field_kwargs = {
+                "default": default,
+                "description": field_schema.get("description", ""),
+                "title": field_schema.get("title", ""),
+            }
+            json_schema_extras = {}
+            for extra_key in ("items", "anyOf", "enum", "properties"):
+                if extra_key in field_schema:
+                    json_schema_extras[extra_key] = field_schema[extra_key]
+            if json_schema_extras:
+                field_kwargs["json_schema_extra"] = json_schema_extras
+
             fields[field_name] = (
                 field_type,
-                Field(
-                    default=default,
-                    description=field_schema.get("description", ""),
-                    title=field_schema.get("title", ""),
-                    items=field_schema.get("items", None),
-                    anyOf=field_schema.get("anyOf", []),
-                    enum=field_schema.get("enum", None),
-                    properties=field_schema.get("properties", {}),
-                ),
+                Field(**field_kwargs),
             )
 
         # Create the model
