@@ -82,6 +82,24 @@ def echo_server_optional_script():
 
 
 @pytest.fixture
+def version_server_script():
+    return dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Version Server")
+
+        @mcp.tool()
+        def version() -> str:
+            """Return MCPAdapt version"""
+            return "1.0"
+
+        mcp.run()
+        '''
+    )
+
+
+@pytest.fixture
 async def echo_sse_server(echo_server_sse_script):
     try:
         process, port = launch_mcp_server(echo_server_sse_script)
@@ -133,6 +151,19 @@ def test_optional_sync(echo_server_optional_script):
         assert tools[1]() == "Echo: empty"
         assert tools[2].name == "echo_tool_union_none"
         assert tools[2](text="hello") == "Echo: hello"
+
+
+def test_no_input_params_sync(version_server_script):
+    """Tools with no input parameters should be adapted and invoked successfully."""
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", version_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0].name == "version"
+        assert tools[0]() == "1.0"
 
 
 def test_tool_name_with_dashes():

@@ -99,12 +99,19 @@ class SmolAgentsAdapter(ToolAdapter):
             if k != "$defs"
         }
 
-        # make sure mandatory `description` and `type` is provided for each arguments:
-        for k, v in input_schema["properties"].items():
+        # make sure mandatory `description` and `type` is provided for each argument:
+        properties = input_schema.get("properties", {})
+        if not isinstance(properties, dict):
+            properties = {}
+
+        for k, v in properties.items():
             if "description" not in v:
-                input_schema["properties"][k]["description"] = "see tool description"
+                properties[k]["description"] = "see tool description"
             if "type" not in v:
-                input_schema["properties"][k]["type"] = "string"
+                properties[k]["type"] = "string"
+
+        # Keep normalized properties even for tools with no input arguments
+        input_schema["properties"] = properties
 
         # Extract and resolve outputSchema if present (only if structured_output=True)
         output_schema = None
