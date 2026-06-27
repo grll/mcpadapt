@@ -33,6 +33,21 @@ if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
 
 
+def _combine_text_contents(content: list[mcp.types.ContentBlock]) -> str:
+    """Return all text blocks from an MCP tool result, joined for agent consumption."""
+    texts = [
+        item.text
+        for item in content
+        if isinstance(item, mcp.types.TextContent)
+    ]
+    if not texts:
+        msg = "expected at least one TextContent block"
+        raise ValueError(msg)
+    if len(texts) == 1:
+        return texts[0]
+    return "\n".join(texts)
+
+
 def _sanitize_function_name(name):
     """
     A function to sanitize function names to be used as a tool name.
@@ -176,61 +191,56 @@ class SmolAgentsAdapter(ToolAdapter):
                     ):
                         return mcp_output.structuredContent
 
-                # Handle multiple content warning (unified for both modes)
-                if len(mcp_output.content) > 1:
-                    warning_msg = (
-                        f"tool {self.name} returned multiple content items but no structuredContent. Using the first content item."
-                        if self.structured_output
-                        else f"tool {self.name} returned multiple content, using the first one"
-                    )
-                    logger.warning(warning_msg)
-
-                # Get the first content item
-                content_item = mcp_output.content[0]
-
-                # Handle different content types
-                if isinstance(content_item, mcp.types.TextContent):
-                    text_content = content_item.text
-
-                    # Always try to parse JSON if structured features are enabled and structuredContent is absent
-                    if self.structured_output and text_content:
-                        try:
-                            parsed_data = json.loads(text_content)
-                            return parsed_data
-                        except json.JSONDecodeError:
-                            logger.warning(
-                                f"tool {self.name} expected structured output but got unparseable text: {text_content[:100]}..."
-                            )
-                            # Fall through to return text as-is for backwards compatibility
-
-                    # Return simple text content (works for both modes)
-                    return text_content
-
-                elif isinstance(content_item, mcp.types.ImageContent):
-                    from PIL import Image
-
-                    image_data = base64.b64decode(content_item.data)
-                    image = Image.open(BytesIO(image_data))
-                    return image
-
-                elif isinstance(content_item, mcp.types.AudioContent):
-                    if not _is_package_available("torchaudio"):
-                        raise ValueError(
-                            "Audio content requires the torchaudio package to be installed. "
-                            "Please install it with `uv add mcpadapt[smolagents,audio]`.",
+                if len(mcp_output.content) > 1 and all(
+                    isinstance(item, mcp.types.TextContent)
+                    for item in mcp_output.content
+                ):
+                    text_content = _combine_text_contents(mcp_output.content)
+                else:
+                    if len(mcp_output.content) > 1:
+                        warning_msg = (
+                            f"tool {self.name} returned multiple content items but no structuredContent. Using the first content item."
+                            if self.structured_output
+                            else f"tool {self.name} returned multiple content, using the first one"
                         )
-                    else:
+                        logger.warning(warning_msg)
+
+                    content_item = mcp_output.content[0]
+
+                    if isinstance(content_item, mcp.types.TextContent):
+                        text_content = content_item.text
+                    elif isinstance(content_item, mcp.types.ImageContent):
+                        from PIL import Image
+
+                        image_data = base64.b64decode(content_item.data)
+                        return Image.open(BytesIO(image_data))
+                    elif isinstance(content_item, mcp.types.AudioContent):
+                        if not _is_package_available("torchaudio"):
+                            raise ValueError(
+                                "Audio content requires the torchaudio package to be installed. "
+                                "Please install it with `uv add mcpadapt[smolagents,audio]`.",
+                            )
                         import torchaudio  # type: ignore
 
                         audio_data = base64.b64decode(content_item.data)
                         audio_io = BytesIO(audio_data)
                         audio_tensor, _ = torchaudio.load(audio_io)
                         return audio_tensor
+                    else:
+                        raise ValueError(
+                            f"tool {self.name} returned an unsupported content type: {type(content_item)}"
+                        )
 
-                else:
-                    raise ValueError(
-                        f"tool {self.name} returned an unsupported content type: {type(content_item)}"
-                    )
+                if self.structured_output and text_content:
+                    try:
+                        parsed_data = json.loads(text_content)
+                        return parsed_data
+                    except json.JSONDecodeError:
+                        logger.warning(
+                            f"tool {self.name} expected structured output but got unparseable text: {text_content[:100]}..."
+                        )
+
+                return text_content
 
         tool = MCPAdaptTool(
             name=mcp_tool.name,
