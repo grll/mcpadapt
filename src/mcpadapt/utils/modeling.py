@@ -1,7 +1,7 @@
-from copy import deepcopy
 from typing import Any, Dict, ForwardRef, List, Optional, Type, Union
+
+import jsonref
 from pydantic import BaseModel, Field, create_model
-import re
 
 json_type_mapping: dict[str, Type] = {
     "string": str,
@@ -13,31 +13,10 @@ json_type_mapping: dict[str, Type] = {
 }
 
 
-def resolve_refs_and_remove_defs(json_obj):
-    # Extract $defs
-    defs = json_obj.get("$defs", {})
-
-    # Function to recursively resolve $ref
-    def _resolve(obj):
-        if isinstance(obj, dict):
-            if "$ref" in obj:
-                ref_path = obj["$ref"]
-                match = re.match(r"#/\$defs/(\w+)", ref_path)
-                if match:
-                    def_key = match.group(1)
-                    return _resolve(deepcopy(defs.get(def_key, {})))
-            return {k: _resolve(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [_resolve(i) for i in obj]
-        else:
-            return obj
-
-    json_obj = _resolve(json_obj)
-
-    # Remove $defs
-    json_obj.pop("$defs", None)
-
-    return json_obj
+def resolve_refs_and_remove_defs(json_obj: dict[str, Any]) -> dict[str, Any]:
+    """Resolve JSON Schema $ref pointers (including in-document paths) and strip $defs."""
+    resolved = jsonref.replace_refs(json_obj, proxies=False)
+    return {key: value for key, value in resolved.items() if key != "$defs"}
 
 
 def create_model_from_json_schema(
