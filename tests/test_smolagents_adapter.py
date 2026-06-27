@@ -330,6 +330,66 @@ def test_structured_output_types():
         assert string_result["result"] == "Hello world"
 
 
+def test_multiple_text_content_blocks_are_combined():
+    """Test that multiple text content blocks are combined for SmolAgents tools."""
+    multiple_content_server_script = dedent(
+        """
+        from mcp.server.lowlevel import Server
+        from mcp.server.stdio import stdio_server
+        import anyio
+        import mcp.types as types
+
+        app = Server("multiple-content-server")
+
+        @app.call_tool()
+        async def call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
+            if name != "multiple_content_tool":
+                raise ValueError(f"Unknown tool: {name}")
+
+            return [
+                types.TextContent(type="text", text="First response"),
+                types.TextContent(type="text", text="Second response"),
+                types.TextContent(type="text", text="Third response"),
+            ]
+
+        @app.list_tools()
+        async def list_tools() -> list[types.Tool]:
+            return [
+                types.Tool(
+                    name="multiple_content_tool",
+                    description="A tool that returns multiple content items",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {},
+                    },
+                )
+            ]
+
+        async def arun():
+            async with stdio_server() as streams:
+                await app.run(
+                    streams[0], streams[1], app.create_initialization_options()
+                )
+
+        anyio.run(arun)
+        """
+    )
+
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv",
+            args=["run", "python", "-c", multiple_content_server_script],
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        tool = tools[0]
+        assert tool.name == "multiple_content_tool"
+
+        result = tool()
+        assert result == "First response\nSecond response\nThird response"
+
+
 def test_structured_output_warning(caplog):
     """Test that warning is logged when tool returns unparseable JSON for structured output."""
     server_script = dedent(
