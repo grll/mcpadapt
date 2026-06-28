@@ -99,12 +99,15 @@ class SmolAgentsAdapter(ToolAdapter):
             if k != "$defs"
         }
 
+        # Parameter-less tools may omit `properties`; treat that as an empty object schema.
+        properties = input_schema.setdefault("properties", {})
+
         # make sure mandatory `description` and `type` is provided for each arguments:
-        for k, v in input_schema["properties"].items():
+        for k, v in properties.items():
             if "description" not in v:
-                input_schema["properties"][k]["description"] = "see tool description"
+                properties[k]["description"] = "see tool description"
             if "type" not in v:
-                input_schema["properties"][k]["type"] = "string"
+                properties[k]["type"] = "string"
 
         # Extract and resolve outputSchema if present (only if structured_output=True)
         output_schema = None
@@ -235,7 +238,7 @@ class SmolAgentsAdapter(ToolAdapter):
         tool = MCPAdaptTool(
             name=mcp_tool.name,
             description=mcp_tool.description or "",
-            inputs=input_schema["properties"],
+            inputs=properties,
             output_type=output_type,
             output_schema=output_schema,
             structured_output=self.structured_output,
