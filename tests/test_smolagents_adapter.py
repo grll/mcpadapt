@@ -135,6 +135,33 @@ def test_optional_sync(echo_server_optional_script):
         assert tools[2](text="hello") == "Echo: hello"
 
 
+def test_tool_with_no_input_parameters():
+    mcp_server_script = dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Version Server")
+
+        @mcp.tool()
+        def server_version() -> str:
+            """Return the server version."""
+            return "1.0.0"
+
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        assert len(tools) == 1
+        assert tools[0].name == "server_version"
+        assert tools[0].inputs == {}
+        assert tools[0]() == "1.0.0"
+
+
 def test_tool_name_with_dashes():
     mcp_server_script = dedent(
         '''
