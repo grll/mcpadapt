@@ -45,6 +45,9 @@ jobs:
         run: |
           source .venv/bin/activate
           pytest tests/
+          uv run --no-project --isolated --with-editable . --with pytest \
+            --with pytest-asyncio --with "mcp>=2,<3" \
+            pytest tests/test_core.py -k "not websocket"
 
   lint:
     runs-on: ubuntu-latest

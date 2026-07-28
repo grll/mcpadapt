@@ -17,15 +17,26 @@ import mcp
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
-from mcp.client.streamable_http import streamablehttp_client
-from mcp.client.websocket import websocket_client
+
+try:
+    from mcp.client.streamable_http import streamable_http_client
+except ImportError:
+    from mcp.client.streamable_http import (
+        streamablehttp_client as streamable_http_client,
+    )
+
+try:
+    from mcp.client.websocket import websocket_client
+except ImportError:
+    websocket_client = None
 
 
 TRANSPORTS = {
     "sse": sse_client,
-    "streamable-http": streamablehttp_client,
-    "ws": websocket_client,
+    "streamable-http": streamable_http_client,
 }
+if websocket_client is not None:
+    TRANSPORTS["ws"] = websocket_client
 
 
 class ToolAdapter(ABC):
