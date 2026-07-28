@@ -83,18 +83,28 @@ def echo_server_sse_script():
     return dedent(
         '''
         import os
-        from mcp.server.fastmcp import FastMCP
 
-        port = int(os.environ.get("MCP_TEST_PORT", "8000"))
+        try:
+            from mcp.server.fastmcp import FastMCP
+        except ImportError:
+            from mcp.server import MCPServer
 
-        mcp = FastMCP("Echo Server", host="127.0.0.1", port=port)
+            mcp = MCPServer("Echo Server")
+            run_kwargs = {"host": "127.0.0.1", "port": int(os.environ.get("MCP_TEST_PORT", "8000"))}
+        else:
+            mcp = FastMCP(
+                "Echo Server",
+                host="127.0.0.1",
+                port=int(os.environ.get("MCP_TEST_PORT", "8000")),
+            )
+            run_kwargs = {}
 
         @mcp.tool()
         def echo_tool(text: str) -> str:
             """Echo the input text"""
             return f"Echo: {text}"
 
-        mcp.run("sse")
+        mcp.run("sse", **run_kwargs)
         '''
     )
 
@@ -117,18 +127,35 @@ def echo_server_streamable_http_script():
     return dedent(
         '''
         import os
-        from mcp.server.fastmcp import FastMCP
-        
-        port = int(os.environ.get("MCP_TEST_PORT", "8000"))
 
-        mcp = FastMCP("Echo Server", host="127.0.0.1", port=port, stateless_http=True, json_response=True)
+        try:
+            from mcp.server.fastmcp import FastMCP
+        except ImportError:
+            from mcp.server import MCPServer
+
+            mcp = MCPServer("Echo Server")
+            run_kwargs = {
+                "host": "127.0.0.1",
+                "port": int(os.environ.get("MCP_TEST_PORT", "8000")),
+                "stateless_http": True,
+                "json_response": True,
+            }
+        else:
+            mcp = FastMCP(
+                "Echo Server",
+                host="127.0.0.1",
+                port=int(os.environ.get("MCP_TEST_PORT", "8000")),
+                stateless_http=True,
+                json_response=True,
+            )
+            run_kwargs = {}
         
         @mcp.tool()
         def echo_tool(text: str) -> str:
             """Echo the input text"""
             return f"Echo: {text}"
 
-        mcp.run("streamable-http")
+        mcp.run("streamable-http", **run_kwargs)
         '''
     )
 
