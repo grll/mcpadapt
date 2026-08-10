@@ -135,6 +135,90 @@ def test_optional_sync(echo_server_optional_script):
         assert tools[2](text="hello") == "Echo: hello"
 
 
+def test_optional_sync_propagates_schema_optionality_and_type(
+    echo_server_optional_script,
+):
+    """The tool.inputs schema handed to the model must reflect the MCP schema's
+    own `required` list, not silently mark every parameter as required.
+
+    Regression guard: `nullable` propagation arrived in #11 and was dropped in
+    #23. It went unnoticed because `test_optional_sync` asserts on call results,
+    and direct calls keep working -- only the schema shown to the model is wrong.
+    """
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", echo_server_optional_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        # echo_tool_optional: `text: str | None = None` -> optional, must be nullable
+        assert tools[0].inputs["text"].get("nullable") is True
+        # echo_tool_default_value: `text: str = "empty"` -> optional, must be nullable
+        assert tools[1].inputs["text"].get("nullable") is True
+        # echo_tool_union_none: `text: str | None` (no default) -> still required
+        assert not tools[2].inputs["text"].get("nullable", False)
+
+
+def test_union_typed_parameter_keeps_its_real_type():
+    """An `int | None` MCP parameter must not be advertised to the model as
+    "string" just because pydantic emitted no top-level `type` key (#68)."""
+    mcp_server_script = dedent(
+        '''
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Numeric Server")
+
+        @mcp.tool()
+        def numeric(count: int | None = None) -> str:
+            """A numeric tool with an optional int parameter"""
+            return str(count)
+
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        assert tools[0].inputs["count"]["type"] == "integer"
+        assert tools[0].inputs["count"].get("nullable") is True
+
+
+def test_literal_union_none_keeps_type_and_enum():
+    """`Literal[...] | None` -- the exact shape reported in #68 -- must reach the
+    model as a string with its `enum` intact, not as a bare string."""
+    mcp_server_script = dedent(
+        '''
+        from typing import Literal
+
+        from mcp.server.fastmcp import FastMCP
+
+        mcp = FastMCP("Lifecycle Server")
+
+        @mcp.tool()
+        def lifecycle(
+            stage: Literal["development", "production", "retired"] | None = None,
+        ) -> str:
+            """A tool with an optional Literal parameter"""
+            return str(stage)
+
+        mcp.run()
+        '''
+    )
+    with MCPAdapt(
+        StdioServerParameters(
+            command="uv", args=["run", "python", "-c", mcp_server_script]
+        ),
+        SmolAgentsAdapter(),
+    ) as tools:
+        stage = tools[0].inputs["stage"]
+        assert stage["type"] == "string"
+        assert stage["enum"] == ["development", "production", "retired"]
+        assert stage.get("nullable") is True
+
+
 def test_tool_name_with_dashes():
     mcp_server_script = dedent(
         '''

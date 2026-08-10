@@ -99,12 +99,29 @@ class SmolAgentsAdapter(ToolAdapter):
             if k != "$defs"
         }
 
-        # make sure mandatory `description` and `type` is provided for each arguments:
+        # make sure mandatory `description` and `type` is provided for each argument,
+        # and propagate the JSON Schema `required` list as smolagents' own `nullable`
+        # key so that optional MCP parameters are not advertised to the model as
+        # mandatory. `nullable` propagation was added in #11 and lost in #23 when
+        # `_generate_tool_inputs` was replaced by a direct `properties` copy.
+        # Resolving `type` from `anyOf` also covers #68.
+        required = set(input_schema.get("required", []))
         for k, v in input_schema["properties"].items():
             if "description" not in v:
-                input_schema["properties"][k]["description"] = "see tool description"
+                v["description"] = "see tool description"
             if "type" not in v:
-                input_schema["properties"][k]["type"] = "string"
+                # union-typed (anyOf) parameter with no top-level `type`: take the
+                # first non-null branch's type instead of defaulting to "string".
+                non_null_options = [
+                    opt for opt in v.get("anyOf", []) if opt.get("type") != "null"
+                ]
+                v["type"] = (
+                    non_null_options[0]["type"] if non_null_options else "string"
+                )
+                if non_null_options and "enum" in non_null_options[0]:
+                    v["enum"] = non_null_options[0]["enum"]
+            if k not in required:
+                v["nullable"] = True
 
         # Extract and resolve outputSchema if present (only if structured_output=True)
         output_schema = None
