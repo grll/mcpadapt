@@ -82,7 +82,7 @@ class ToolAdapter(ABC):
 @asynccontextmanager
 async def mcptools(
     serverparams: StdioServerParameters | dict[str, Any],
-    client_session_timeout_seconds: float | timedelta | None = 5,
+    client_session_timeout_seconds: int | float | timedelta | None = 5,
 ) -> AsyncGenerator[tuple[ClientSession, list[mcp.types.Tool]], None]:
     """Async context manager that yields tools from an MCP server.
 
@@ -121,8 +121,10 @@ async def mcptools(
         )
 
     timeout = None
-    if isinstance(client_session_timeout_seconds, float):
-        timeout = timedelta(seconds=client_session_timeout_seconds)
+    if isinstance(client_session_timeout_seconds, (int, float)) and not isinstance(
+        client_session_timeout_seconds, bool
+    ):
+        timeout = timedelta(seconds=float(client_session_timeout_seconds))
     elif isinstance(client_session_timeout_seconds, timedelta):
         timeout = client_session_timeout_seconds
 
@@ -186,7 +188,7 @@ class MCPAdapt:
         | list[StdioServerParameters | dict[str, Any]],
         adapter: ToolAdapter,
         connect_timeout: int = 30,
-        client_session_timeout_seconds: float | timedelta | None = 5,
+        client_session_timeout_seconds: int | float | timedelta | None = 5,
     ):
         """
         Manage the MCP server / client lifecycle and expose tools adapted with the adapter.
