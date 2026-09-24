@@ -564,3 +564,60 @@ def test_client_session_timeout_parameter_propagation(echo_server_script):
         DummyAdapter(),
     )
     assert adapter_default.client_session_timeout_seconds == 5
+
+
+@pytest.mark.asyncio
+async def test_mcptools_converts_int_client_session_timeout(echo_server_script):
+    """Integer timeout seconds (including the default) must reach ClientSession."""
+    from datetime import timedelta
+    from unittest.mock import MagicMock, patch
+
+    from mcpadapt.core import mcptools
+
+    captured: dict[str, timedelta | None] = {}
+
+    class FakeSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def initialize(self):
+            pass
+
+        async def list_tools(self):
+            return MagicMock(tools=[])
+
+    def fake_client_session(read, write, timeout):
+        captured["timeout"] = timeout
+        return FakeSession()
+
+    class FakeStdioClient:
+        async def __aenter__(self):
+            return (MagicMock(), MagicMock())
+
+        async def __aexit__(self, *args):
+            pass
+
+    server = StdioServerParameters(
+        command="uv", args=["run", "python", "-c", echo_server_script]
+    )
+
+    with patch("mcpadapt.core.stdio_client", return_value=FakeStdioClient()), patch(
+        "mcpadapt.core.ClientSession", side_effect=fake_client_session
+    ):
+        async with mcptools(server, client_session_timeout_seconds=5):
+            pass
+
+    assert captured["timeout"] == timedelta(seconds=5)
+
+    captured.clear()
+
+    with patch("mcpadapt.core.stdio_client", return_value=FakeStdioClient()), patch(
+        "mcpadapt.core.ClientSession", side_effect=fake_client_session
+    ):
+        async with mcptools(server):
+            pass
+
+    assert captured["timeout"] == timedelta(seconds=5)
