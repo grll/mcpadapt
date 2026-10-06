@@ -1,12 +1,15 @@
 import time
+import threading
 from textwrap import dedent
 from typing import Any, Callable, Coroutine
 
 import mcp
 import pytest
 from mcp import StdioServerParameters
+from mcp.types import ListToolsResult, Tool
 
-from mcpadapt.core import MCPAdapt, ToolAdapter
+import mcpadapt.core as core
+from mcpadapt.core import MCPAdapt, ToolAdapter, mcptools
 from tests._server_utils import launch_mcp_server, terminate_mcp_server
 
 
@@ -26,6 +29,30 @@ class DummyAdapter(ToolAdapter):
         mcp_tool: mcp.types.Tool,
     ):
         return afunc
+
+
+class FakePaginatedSession:
+    def __init__(
+        self,
+        pages: dict[str | None, ListToolsResult],
+    ) -> None:
+        self.pages = pages
+        self.cursors: list[str | None] = []
+        self.calls: list[tuple[str, dict | None]] = []
+
+    async def list_tools(self, cursor: str | None = None) -> ListToolsResult:
+        self.cursors.append(cursor)
+        return self.pages[cursor]
+
+    async def call_tool(
+        self, name: str, arguments: dict | None = None
+    ) -> tuple[str, dict | None]:
+        self.calls.append((name, arguments))
+        return name, arguments
+
+
+def make_tool(name: str) -> Tool:
+    return Tool(name=name, description=f"{name} tool", inputSchema={"type": "object"})
 
 
 @pytest.fixture
@@ -291,6 +318,114 @@ def slow_start_server_script():
         mcp.run()
         '''
     )
+
+
+async def test_atools_uses_all_pages_for_independent_sessions_and_call_bindings():
+    first = FakePaginatedSession(
+        {
+            None: ListToolsResult(tools=[make_tool("first")], nextCursor="next-first"),
+            "next-first": ListToolsResult(tools=[make_tool("second")]),
+        }
+    )
+    second = FakePaginatedSession(
+        {
+            None: ListToolsResult(tools=[], nextCursor="next-second"),
+            "next-second": ListToolsResult(tools=[make_tool("third")]),
+        }
+    )
+
+    adapter = MCPAdapt([], DummyAdapter())
+    adapter.sessions = [first, second]
+
+    tools = await adapter.atools()
+
+    assert [await tool({}) for tool in tools] == [
+        ("first", {}),
+        ("second", {}),
+        ("third", {}),
+    ]
+    assert first.cursors == [None, "next-first"]
+    assert second.cursors == [None, "next-second"]
+    assert first.calls == [("first", {}), ("second", {})]
+    assert second.calls == [("third", {})]
+
+
+def test_tools_uses_all_pages_on_fresh_refresh_and_preserves_session_binding():
+    first = FakePaginatedSession(
+        {
+            None: ListToolsResult(tools=[make_tool("stale")]),
+            "refresh": ListToolsResult(tools=[make_tool("first")], nextCursor="later"),
+            "later": ListToolsResult(tools=[make_tool("second")]),
+        }
+    )
+    second = FakePaginatedSession(
+        {
+            None: ListToolsResult(tools=[make_tool("third")]),
+            "refresh": ListToolsResult(tools=[make_tool("fourth")]),
+        }
+    )
+    adapter = MCPAdapt([], DummyAdapter())
+    adapter.sessions = [first, second]
+    first.pages[None] = ListToolsResult(tools=[], nextCursor="refresh")
+    second.pages[None] = ListToolsResult(tools=[], nextCursor="refresh")
+
+    thread = threading.Thread(target=adapter.loop.run_forever)
+    thread.start()
+    try:
+        tools = adapter.tools()
+        assert [
+            tool({"value": tool_index}) for tool_index, tool in enumerate(tools)
+        ] == [
+            ("first", {"value": 0}),
+            ("second", {"value": 1}),
+            ("fourth", {"value": 2}),
+        ]
+    finally:
+        adapter.loop.call_soon_threadsafe(adapter.loop.stop)
+        thread.join()
+        adapter.loop.close()
+
+    assert first.cursors == [None, "refresh", "later"]
+    assert second.cursors == [None, "refresh"]
+    assert first.calls == [("first", {"value": 0}), ("second", {"value": 1})]
+    assert second.calls == [("fourth", {"value": 2})]
+
+
+async def test_mcptools_uses_all_pages(monkeypatch):
+    class FakeClient:
+        async def __aenter__(self):
+            return "read", "write"
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    class FakeClientSession(FakePaginatedSession):
+        def __init__(self, read, write, timeout) -> None:
+            super().__init__(
+                {
+                    None: ListToolsResult(
+                        tools=[make_tool("first")], nextCursor="opaque-1"
+                    ),
+                    "opaque-1": ListToolsResult(tools=[], nextCursor="opaque-2"),
+                    "opaque-2": ListToolsResult(tools=[make_tool("last")]),
+                }
+            )
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        async def initialize(self) -> None:
+            pass
+
+    monkeypatch.setattr(core, "stdio_client", lambda serverparams: FakeClient())
+    monkeypatch.setattr(core, "ClientSession", FakeClientSession)
+
+    async with mcptools(StdioServerParameters(command="unused")) as (session, tools):
+        assert [tool.name for tool in tools] == ["first", "last"]
+        assert session.cursors == [None, "opaque-1", "opaque-2"]
 
 
 def test_basic_sync(echo_server_script):

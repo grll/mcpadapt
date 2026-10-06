@@ -28,6 +28,19 @@ TRANSPORTS = {
 }
 
 
+async def _list_all_tools(session: ClientSession) -> list[mcp.types.Tool]:
+    """List all tools from a session, following paginated MCP responses."""
+    tools: list[mcp.types.Tool] = []
+    cursor: str | None = None
+
+    while True:
+        response = await session.list_tools(cursor=cursor)
+        tools.extend(response.tools)
+        cursor = response.nextCursor
+        if cursor is None:
+            return tools
+
+
 class ToolAdapter(ABC):
     """A basic interface for adapting tools from MCP to the desired Agent framework."""
 
@@ -134,8 +147,8 @@ async def mcptools(
         ) as session:
             # Initialize the connection and get the tools from the mcp server
             await session.initialize()
-            tools = await session.list_tools()
-            yield session, tools.tools
+            tools = await _list_all_tools(session)
+            yield session, tools
 
 
 class MCPAdapt:
@@ -270,14 +283,11 @@ class MCPAdapt:
         # refresh tools
         mcp_tools: list[list[mcp.types.Tool]] = []
 
-        async def _list_tools(session: ClientSession) -> list[mcp.types.Tool]:
-            return (await session.list_tools()).tools
-
         for session in self.sessions:
             mcp_tools.extend(
                 [
                     asyncio.run_coroutine_threadsafe(
-                        _list_tools(session), self.loop
+                        _list_all_tools(session), self.loop
                     ).result(timeout=self.connect_timeout)
                 ]
             )
@@ -326,7 +336,7 @@ class MCPAdapt:
         see :meth:`tools`.
         """
         # refresh tools
-        self.mcp_tools = [(await s.list_tools()).tools for s in self.sessions]
+        self.mcp_tools = [await _list_all_tools(s) for s in self.sessions]
 
         return [
             self.adapter.async_adapt(partial(session.call_tool, tool.name), tool)
