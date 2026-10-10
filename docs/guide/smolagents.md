@@ -122,3 +122,28 @@ You can find a fully working script of this example [here](https://github.com/gr
 
 
 
+
+## MCP tool execution errors
+
+A response with `isError=True` raises `MCPToolExecutionError` in both adapter modes.
+It is checked before extracting text or `structuredContent`, so a failed lookup
+cannot be mistaken for a successful empty result. The exception message includes
+all non-empty text blocks and any structured error details. Its `result` attribute
+retains the complete original `CallToolResult`, including non-text content and
+metadata; `tool_name` identifies the adapted tool.
+
+```python
+from mcpadapt.smolagents_adapter import MCPToolExecutionError
+
+try:
+    result = lookup(query="example")  # an adapted MCP tool
+except MCPToolExecutionError as error:
+    print(error)
+    # Record a technical failure; do not substitute {"results": []}.
+    original_response = error.result
+```
+
+When invoked by a smolagents agent, the framework handles this exception as a tool
+execution failure. Successful responses keep their existing text/JSON behavior.
+With `structured_output=True`, available `structuredContent` is returned unchanged,
+including an empty dictionary or a valid empty lookup, even with no content blocks.

@@ -1,4 +1,3 @@
-import logging
 from pathlib import Path
 from textwrap import dedent
 
@@ -6,7 +5,7 @@ import pytest
 from mcp import StdioServerParameters
 
 from mcpadapt.core import MCPAdapt
-from mcpadapt.smolagents_adapter import SmolAgentsAdapter
+from mcpadapt.smolagents_adapter import MCPToolExecutionError, SmolAgentsAdapter
 from tests._server_utils import launch_mcp_server, terminate_mcp_server
 
 
@@ -330,8 +329,8 @@ def test_structured_output_types():
         assert string_result["result"] == "Hello world"
 
 
-def test_structured_output_warning(caplog):
-    """Test that warning is logged when tool returns unparseable JSON for structured output."""
+def test_structured_output_server_error():
+    """A server output validation failure must be raised as an MCP error."""
     server_script = dedent(
         '''
         from mcp.server.fastmcp import FastMCP
@@ -356,13 +355,7 @@ def test_structured_output_warning(caplog):
     ) as tools:
         tool = tools[0]
 
-        # Tool should still work but return error string
-        result = tool()
-        assert isinstance(result, str)
-        assert "error" in result.lower()
-
-        # Warning should be logged about unparseable JSON
-        assert any(
-            r.levelno == logging.WARNING and "unparseable" in r.message.lower()
-            for r in caplog.records
-        )
+        with pytest.raises(MCPToolExecutionError, match="isError=True") as exc:
+            tool()
+        assert exc.value.result.isError is True
+        assert "error" in str(exc.value).lower()

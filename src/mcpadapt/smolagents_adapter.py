@@ -55,6 +55,26 @@ def _sanitize_function_name(name):
     return name
 
 
+class MCPToolExecutionError(RuntimeError):
+    """An MCP tool reported an execution error, with its full result retained."""
+
+    def __init__(self, tool_name: str, result: mcp.types.CallToolResult):
+        """Retain the MCP result and expose text and structured error details."""
+        self.tool_name = tool_name
+        self.result = result
+        details = [
+            item.text
+            for item in result.content
+            if isinstance(item, mcp.types.TextContent) and item.text
+        ]
+        if result.structuredContent is not None:
+            details.append("structuredContent: " + json.dumps(result.structuredContent))
+        message = f"MCP tool {tool_name} failed (isError=True)"
+        if details:
+            message += ": " + "\n".join(details)
+        super().__init__(message)
+
+
 class SmolAgentsAdapter(ToolAdapter):
     """Adapter for the `smolagents` framework.
 
@@ -163,9 +183,9 @@ class SmolAgentsAdapter(ToolAdapter):
                 else:
                     mcp_output = func(kwargs)
 
-                # Early exit for empty content
-                if not mcp_output.content:
-                    raise ValueError(f"tool {self.name} returned an empty content")
+                # Errors must not become success-shaped text or structured data.
+                if mcp_output.isError:
+                    raise MCPToolExecutionError(self.name, mcp_output)
 
                 # Handle structured features if enabled
                 if self.structured_output:
@@ -175,6 +195,9 @@ class SmolAgentsAdapter(ToolAdapter):
                         and mcp_output.structuredContent is not None
                     ):
                         return mcp_output.structuredContent
+
+                if not mcp_output.content:
+                    raise ValueError(f"tool {self.name} returned an empty content")
 
                 # Handle multiple content warning (unified for both modes)
                 if len(mcp_output.content) > 1:
