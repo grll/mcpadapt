@@ -366,3 +366,43 @@ def test_structured_output_warning(caplog):
             r.levelno == logging.WARNING and "unparseable" in r.message.lower()
             for r in caplog.records
         )
+
+
+def test_structured_output_raises_on_tool_execution_error():
+    """isError must not be masked when structuredContent is present (#94)."""
+    from mcp.types import CallToolResult, TextContent, Tool as MCPTool
+
+    definition = MCPTool(
+        name="synthetic_lookup",
+        description="Offline synthetic lookup",
+        inputSchema={
+            "type": "object",
+            "properties": {"query": {"type": "string", "description": "Query"}},
+            "required": ["query"],
+        },
+    )
+    success_response = CallToolResult(
+        content=[TextContent(type="text", text='{"results":[]}')],
+        structuredContent={"results": []},
+        isError=False,
+    )
+    error_response = CallToolResult(
+        content=[
+            TextContent(type="text", text="Synthetic backend failure"),
+        ],
+        structuredContent={"results": []},
+        isError=True,
+    )
+
+    adapter = SmolAgentsAdapter(structured_output=True)
+    success_tool = adapter.adapt(
+        lambda arguments, response=success_response: response, definition
+    )
+    error_tool = adapter.adapt(
+        lambda arguments, response=error_response: response, definition
+    )
+
+    assert success_tool(query="synthetic") == {"results": []}
+
+    with pytest.raises(ValueError, match="Synthetic backend failure"):
+        error_tool(query="synthetic")

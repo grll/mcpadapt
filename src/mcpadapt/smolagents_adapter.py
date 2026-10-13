@@ -33,6 +33,21 @@ if TYPE_CHECKING:
     from PIL.Image import Image as PILImage
 
 
+def _tool_execution_error_message(
+    result: mcp.types.CallToolResult, tool_name: str
+) -> str:
+    """Build a human-readable message from a failed MCP tool call."""
+    parts: list[str] = []
+    for item in result.content or []:
+        if isinstance(item, mcp.types.TextContent) and item.text:
+            parts.append(item.text)
+    if parts:
+        return "\n".join(parts)
+    if result.structuredContent is not None:
+        return json.dumps(result.structuredContent)
+    return f"tool {tool_name} returned a tool execution error"
+
+
 def _sanitize_function_name(name):
     """
     A function to sanitize function names to be used as a tool name.
@@ -162,6 +177,11 @@ class SmolAgentsAdapter(ToolAdapter):
                         )
                 else:
                     mcp_output = func(kwargs)
+
+                if mcp_output.isError:
+                    raise ValueError(
+                        _tool_execution_error_message(mcp_output, self.name)
+                    )
 
                 # Early exit for empty content
                 if not mcp_output.content:
